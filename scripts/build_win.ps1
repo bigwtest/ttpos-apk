@@ -13,8 +13,9 @@ if (Test-Path ".\build\windows\x64\runner\Release") {
     Remove-Item -Path ".\build\windows\x64\runner\Release" -Recurse -Force
 }
 
-# 执行 Windows 构建
-flutter build windows --dart-define-from-file=.env.production.local
+# 执行 Windows 构建，添加非交互参数
+Write-Host "开始构建 Windows 应用..."
+flutter build windows --no-pub --no-analytics --dart-define-from-file=.env.production.local
 
 # 创建发布目录
 $releaseDir = "$currentDir\..\..\releases\$env:MELOS_PACKAGE_NAME\$env:MELOS_PACKAGE_VERSION"
@@ -62,13 +63,17 @@ Copy-Item -Path "$vcDllDir\*" -Destination $tempDir -Recurse -Force -ErrorAction
 
 # 压缩文件
 try {
+    Write-Host "开始压缩文件..."
     Compress-Archive -Path "$tempDir\*" -DestinationPath $zipFileName -Force
     # 复制压缩文件到发布目录
     Copy-Item -Path $zipFileName -Destination $releaseDir -Force
     Write-Host "成功创建压缩文件: $zipFileName"
 } catch {
-    Write-Host "压缩文件时出错: $_"
+    Write-Error "压缩文件时出错: $_"
+    exit 1
 } finally {
     # 清理临时目录
     Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    # 返回原始目录
+    Set-Location $currentDir
 }

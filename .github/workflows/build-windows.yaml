@@ -37,8 +37,8 @@ on:
         required: true
         type: choice
         options:
-          - "new-test"
           - "main"
+          - "new-test"
       build_type:
         description: "选择构建类型"
         required: true
