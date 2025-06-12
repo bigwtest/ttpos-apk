@@ -18,18 +18,18 @@ env:
   scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Cashier/' }}
 
 on:
-  # push:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'apps/**'
-  #     - 'packages/**'
-  #     - '.github/workflows/build_windows.yml'
-  # pull_request:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'apps/**'
-  #     - 'packages/**'
-  #     - '.github/workflows/build_windows.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/build-windows.yaml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/build-windows.yaml'
   workflow_dispatch:
     inputs:
       branch:
@@ -38,7 +38,7 @@ on:
         type: choice
         options:
           - "new-test"
-          - "release"
+          - "main"
       build_type:
         description: "选择构建类型"
         required: true
