@@ -211,14 +211,14 @@ jobs:
           }
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
-          # 配置 CMake
-          Write-Host "配置 CMake..."
-          $cmakeConfig = @"
-          set(CMAKE_CXX_STANDARD 20)
-          set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          set(CMAKE_CXX_EXTENSIONS OFF)
-          "@
-          $cmakeConfig | Out-File -FilePath "windows\CMakeLists.txt" -Append -Encoding UTF8
+          # # 配置 CMake
+          # Write-Host "配置 CMake..."
+          # $cmakeConfig = @"
+          # set(CMAKE_CXX_STANDARD 20)
+          # set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          # set(CMAKE_CXX_EXTENSIONS OFF)
+          # "@
+          # $cmakeConfig | Out-File -FilePath "windows\CMakeLists.txt" -Append -Encoding UTF8
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
