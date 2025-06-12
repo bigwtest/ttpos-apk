@@ -135,11 +135,50 @@ jobs:
 
       - name: Config API_BASE_URL
         run: |
+          Write-Host "配置环境变量..."
+          Write-Host "base_url: ${{ github.event.inputs.base_url }}"
+          Write-Host "base_ws_url: ${{ github.event.inputs.base_ws_url }}"
+          
+          # 设置环境变量
           $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
           $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
-          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
-          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
-          Get-Content apps/${{ matrix.package_name }}/.env.production.local
+          
+          # 确保环境变量不为空
+          if ([string]::IsNullOrEmpty($env:API_BASE_URL)) {
+            Write-Error "API_BASE_URL 不能为空"
+            exit 1
+          }
+          if ([string]::IsNullOrEmpty($env:WS_BASE_URL)) {
+            Write-Error "WS_BASE_URL 不能为空"
+            exit 1
+          }
+          
+          # 更新 .env 文件
+          $envFile = "apps/${{ matrix.package_name }}/.env.production.local"
+          if (-not (Test-Path $envFile)) {
+            Write-Error "环境文件不存在: $envFile"
+            exit 1
+          }
+          
+          Write-Host "更新环境文件: $envFile"
+          $content = Get-Content $envFile -Raw
+          $content = $content -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL"
+          $content = $content -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL"
+          $content | Set-Content $envFile
+          
+          Write-Host "环境文件内容:"
+          Get-Content $envFile
+          
+          # 验证更新
+          $updatedContent = Get-Content $envFile -Raw
+          if (-not ($updatedContent -match "API_BASE_URL=$env:API_BASE_URL")) {
+            Write-Error "API_BASE_URL 更新失败"
+            exit 1
+          }
+          if (-not ($updatedContent -match "WS_BASE_URL=$env:WS_BASE_URL")) {
+            Write-Error "WS_BASE_URL 更新失败"
+            exit 1
+          }
 
       - name: Build Windows
         run: |
