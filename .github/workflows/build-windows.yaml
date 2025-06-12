@@ -82,7 +82,7 @@ on:
 
 jobs:
   prepare:
-    runs-on: windows-2022
+    runs-on: windows-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -119,35 +119,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Windows Build Tools
-        shell: pwsh
-        run: |
-          # 安装 Chocolatey
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-          
-          # 刷新环境变量
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          
-          # 安装 Visual Studio 2022 构建工具
-          Write-Host "Installing Visual Studio Build Tools..."
-          $vsInstallerUrl = "https://aka.ms/vs/17/release/vs_buildtools.exe"
-          $vsInstallerExe = "$env:TEMP\vs_buildtools.exe"
-          Invoke-WebRequest -Uri $vsInstallerUrl -OutFile $vsInstallerExe
-          Start-Process -FilePath $vsInstallerExe -ArgumentList "--quiet", "--wait", "--norestart", "--nocache", `
-            "--installPath", "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools", `
-            "--add", "Microsoft.VisualStudio.Workload.VCTools", `
-            "--add", "Microsoft.VisualStudio.Component.Windows10SDK.19041", `
-            "--add", "Microsoft.VisualStudio.Component.CMake.Project" -Wait
-          
-          # 安装 CMake 和 Ninja
-          Write-Host "Installing CMake and Ninja..."
-          choco install cmake ninja --yes --no-progress
-          
-          # 刷新环境变量
-          refreshenv
-
       - name: Install Melos
         run: |
           flutter --version
@@ -169,14 +140,6 @@ jobs:
           (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
           (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
           Get-Content apps/${{ matrix.package_name }}/.env.production.local
-
-      - name: Set environment variables
-        run: |
-          $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
-          $version = (Get-Content apps/${{ matrix.package_name }}/pubspec.yaml | Select-String 'version:' | ForEach-Object { $_.Line.Split(':')[1].Trim() }).Split('+')[0]
-          $env:MELOS_PACKAGE_VERSION = $version
-          echo "MELOS_PACKAGE_NAME=$env:MELOS_PACKAGE_NAME" >> $env:GITHUB_ENV
-          echo "MELOS_PACKAGE_VERSION=$env:MELOS_PACKAGE_VERSION" >> $env:GITHUB_ENV
 
       - name: Build Windows
         run: |
