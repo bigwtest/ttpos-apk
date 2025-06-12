@@ -112,45 +112,18 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - name: Setup Flutter Windows Environment
+        uses: invertase/flutter-windows-action@v1
         with:
           flutter-version: '3.27.3'
           channel: 'stable'
           cache: true
           cache-key: flutter-windows-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
           cache-path: ${{ github.workspace }}/.pub-cache
-
-      - name: Install Windows Build Tools
-        shell: pwsh
-        run: |
-          # 安装 Chocolatey
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-          
-          # 刷新环境变量
-          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          
-          # 安装 Visual Studio 2022 构建工具
-          choco install visualstudio2022buildtools visualstudio2022-workload-vctools --yes --no-progress
-          
-          # 安装 CMake
-          choco install cmake --yes --no-progress
-          
-          # 安装 Ninja
-          choco install ninja --yes --no-progress
-          
-          # 刷新环境变量
-          refreshenv
-
-      - name: Setup Windows SDK
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: '2024-02-14'
-          runVcpkgInstall: true
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          vcpkgTriplet: 'x64-windows'
+          visual-studio: '2022'
+          visual-studio-workloads: 'Microsoft.VisualStudio.Workload.VCTools;Microsoft.VisualStudio.Component.Windows10SDK.19041;Microsoft.VisualStudio.Component.CMake.Project'
+          cmake: true
+          ninja: true
 
       - name: Install Melos
         run: |
