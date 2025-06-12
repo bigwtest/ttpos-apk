@@ -102,7 +102,7 @@ jobs:
 
   build:
     needs: prepare
-    runs-on: windows-lastest
+    runs-on: windows-latest
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
