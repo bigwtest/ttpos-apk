@@ -15,7 +15,7 @@ if (Test-Path ".\build\windows\x64\runner\Release") {
 
 # 执行 Windows 构建，添加非交互参数
 Write-Host "开始构建 Windows 应用..."
-flutter build windows --no-pub --no-analytics --dart-define-from-file=.env.production.local
+flutter build windows --no-pub --dart-define-from-file=.env.production.local
 
 # 创建发布目录
 $releaseDir = "$currentDir\..\..\releases\$env:MELOS_PACKAGE_NAME\$env:MELOS_PACKAGE_VERSION"
