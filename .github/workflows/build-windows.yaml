@@ -99,7 +99,6 @@ jobs:
             include = $packages | ForEach-Object { @{ package_name = $_ } }
           } | ConvertTo-Json -Compress
           "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
   build:
     needs: prepare
     runs-on: windows-latest
@@ -117,14 +116,13 @@ jobs:
         with:
           flutter-version: '3.27.3'
           channel: 'stable'
-          #cache: true
+          cache: true
 
       - name: Install Melos
         run: |
           flutter --version
           dart --version
           dart pub global activate melos
-
       - name: Melos init config
         env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
@@ -132,7 +130,6 @@ jobs:
         run: |
           melos run init
           melos bs
-
       - name: Config API_BASE_URL
         shell: pwsh
         run: |
@@ -201,54 +198,27 @@ jobs:
           }
           
           Write-Host "环境变量更新成功"
-
       - name: Build Windows
         run: |
           # 记录项目根目录
           $rootDir = $PWD
           Write-Host "项目根目录: $rootDir"
-
           # 进入应用目录
           $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
           if (-not (Test-Path $appDir)) {
-              Write-Error "应用目录不存在: $appDir"
-              exit 1
+            Write-Error "应用目录不存在: $appDir"
+            exit 1
           }
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
-
-          # --- 新增：修复插件错误 ---
-          $flutterTtsPath = Join-Path $rootDir "packages\flutter_tts\windows"
-          $coroutineFile = Join-Path $flutterTtsPath "cpp\flutter_tts.cpp"
-
-          if (Test-Path $coroutineFile) {
-              Write-Host "修复flutter_tts协程头文件..."
-              $content = Get-Content $coroutineFile -Raw
-              $fixedContent = $content -replace '#include <experimental/coroutine>', '#include <coroutine>'
-              $fixedContent | Set-Content $coroutineFile -Encoding UTF8
-              Write-Host "文件已更新: $coroutineFile"
-          } else {
-              Write-Warning "未找到flutter_tts.cpp文件，跳过修复"
-          }
-          # ----------------
-
-          # 配置 CMake (增强版本)
+          # 配置 CMake
           Write-Host "配置 CMake..."
           $cmakeConfig = @"
-          cmake_minimum_required(VERSION 3.14)
-          cmake_policy(SET CMP0153 NEW)
           set(CMAKE_CXX_STANDARD 20)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
           set(CMAKE_CXX_EXTENSIONS OFF)
-          
-          # 解决协程问题关键设置
-          if(MSVC)
-            add_compile_options(/await)
-            add_definitions(-DUSE_CO_MODULES)
-          endif()
           "@
           $cmakeConfig | Out-File -FilePath "windows\CMakeLists.txt" -Append -Encoding UTF8
-
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
@@ -256,17 +226,14 @@ jobs:
             exit 1
           }
           Write-Host "开始执行构建脚本: $scriptPath"
-
           # 设置错误处理
           $ErrorActionPreference = 'Continue'
           try {
             # 设置环境变量
             $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
             Write-Host "包名: $env:MELOS_PACKAGE_NAME"
-
             # 直接执行构建脚本
             & $scriptPath
-
             # 检查构建结果
             $releaseDir = Join-Path $rootDir "releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION"
             if (Test-Path $releaseDir) {
@@ -289,7 +256,6 @@ jobs:
             # 恢复错误处理设置
             $ErrorActionPreference = 'Stop'
           }
-
       - name: SCP-UPLOAD
         if: github.event.inputs.scp == 'on'
         uses: Comori/ssh@v0.0.7
@@ -315,4 +281,4 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
