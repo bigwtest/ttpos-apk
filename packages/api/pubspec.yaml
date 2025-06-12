@@ -1,0 +1,44 @@
+name: ttpos_api
+description: "API package for ttpos"
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  basic_utils: ^5.7.0
+  bot_toast: ^4.1.3
+  connectivity_plus: ^6.1.1
+  crypto: ^3.0.6
+  device_info_plus: ^10.1.2
+  dio: ^5.7.0
+  dio_smart_retry: ^7.0.1
+  encrypt: ^5.0.3
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^9.2.4
+  get: ^4.6.6
+  package_info_plus: ^8.3.0
+  pointycastle: ^3.9.1
+  pretty_dio_logger: ^1.4.0
+  shared_preferences: ^2.3.4
+  timezone: ^0.10.0
+  ttpos_i18n: ^0.0.1
+  ttpos_logger: ^0.0.1
+  ttpos_model: ^0.0.1
+  ttpos_shared: ^0.0.1
+  uuid: ^4.4.2
+  web_socket_client: ^0.2.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/

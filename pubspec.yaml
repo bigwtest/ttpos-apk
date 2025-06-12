@@ -1,0 +1,13 @@
+name: ttpos
+
+environment:
+  sdk: ">=3.5.3 <4.0.0"
+dev_dependencies:
+  melos: ^6.1.0
+
+workspace:
+  - packages/model
+  - packages/logger
+  - packages/dotenv
+  - packages/flutter_subscreen_plugin
+  - packages/shared

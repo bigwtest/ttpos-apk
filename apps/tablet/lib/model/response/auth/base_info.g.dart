@@ -1,0 +1,35 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'base_info.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+_$BaseInfoImpl _$$BaseInfoImplFromJson(Map<String, dynamic> json) =>
+    _$BaseInfoImpl(
+      buffet: Buffet.fromJson(json['buffet'] as Map<String, dynamic>),
+      business: Business.fromJson(json['business'] as Map<String, dynamic>),
+      cloud: Cloud.fromJson(json['cloud'] as Map<String, dynamic>),
+      company: Company.fromJson(json['company'] as Map<String, dynamic>),
+      currency: Currency.fromJson(json['currency'] as Map<String, dynamic>),
+      updateTime: (json['update_time'] as num?)?.toInt() ?? 0,
+      systemVersion: json['system_version'] as String?,
+      realName: json['real_name'] as String?,
+      tablet: Tablet.fromJson(json['tablet'] as Map<String, dynamic>),
+      kitchen: Kitchen.fromJson(json['kitchen'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$$BaseInfoImplToJson(_$BaseInfoImpl instance) =>
+    <String, dynamic>{
+      'buffet': instance.buffet,
+      'business': instance.business,
+      'cloud': instance.cloud,
+      'company': instance.company,
+      'currency': instance.currency,
+      'update_time': instance.updateTime,
+      'system_version': instance.systemVersion,
+      'real_name': instance.realName,
+      'tablet': instance.tablet,
+      'kitchen': instance.kitchen,
+    };

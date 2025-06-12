@@ -1,0 +1,21 @@
+services:
+  mobile:
+    image: ttpos-flutter/mobile
+    build:
+      context: .
+      dockerfile: Dockerfile.mobile
+    ports:
+      - 40900:80
+    volumes:
+      - ./releases/mobile/2.1.13:/usr/share/nginx/html
+    restart: unless-stopped
+  menu:
+    image: ttpos-flutter/menu
+    build:
+      context: .
+      dockerfile: Dockerfile.menu
+    ports:
+      - 40910:80
+    volumes:
+      - ./releases/menu/2.1.13:/usr/share/nginx/html
+    restart: unless-stopped

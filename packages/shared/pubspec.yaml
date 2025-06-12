@@ -1,0 +1,28 @@
+name: ttpos_shared
+description: Shared libraries for the app.
+version: 0.0.1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+
+# Add regular dependencies here.
+dependencies:
+  dart_mq: ^1.1.0
+  image: ^4.2.0
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  pdf: ^3.11.1
+  timezone: ^0.10.0
+
+dev_dependencies:
+  import_sorter: ^4.6.0
+  lints: ^5.0.0
+  test: ^1.24.0
+
+import_sorter:
+  emojis: false
+  comments: true
+  ignored_files:
+    - \/lib\/prisma\/*

@@ -1,0 +1,16 @@
+include: package:lints/recommended.yaml
+
+linter:
+  rules:
+    require_trailing_commas: true
+
+analyzer:
+  errors:
+    unnecessary_library_name: ignore
+  exclude:
+    - "**/font/*.dart"
+    - "**/loader/*.dart"
+    - "**/locale/*.dart"
+    - "**/mq/*.dart"
+    - "**/printer/*.dart"
+    - "**/utils/*.dart"

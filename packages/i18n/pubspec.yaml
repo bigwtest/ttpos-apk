@@ -1,0 +1,26 @@
+name: ttpos_i18n
+description: "i18n package for ttpos"
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=1.17.0"
+
+dependencies:
+  collection: ^1.19.0
+  flutter:
+    sdk: flutter
+  get: ^4.6.6
+  shared_preferences: ^2.3.4
+  ttpos_logger: ^0.0.1
+  ttpos_model: ^0.0.1
+  ttpos_shared: ^0.0.1
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

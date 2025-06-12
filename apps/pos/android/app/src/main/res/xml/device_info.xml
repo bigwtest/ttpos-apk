@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 芯烨1.0 -->
+    <usb-device vendor-id="1155" product-id="22339" />
+    <!-- 芯烨2.0 -->
+    <usb-device vendor-id="8137" product-id="8214" />
+    <!-- 佳博1.0 -->
+    <usb-device vendor-id="1137" product-id="85" />
+
+</resources>

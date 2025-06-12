@@ -1,0 +1,40 @@
+import 'package:get/get.dart';
+import 'package:kds/model/request/req_list.dart';
+import 'package:kds/model/response/resp_production.dart';
+import 'package:ttpos_api/api.dart';
+import 'package:ttpos_api/controller.dart';
+import 'package:ttpos_logger/logger.dart';
+import 'package:ttpos_model/base/request/options.dart';
+
+class ProductionOrderListByCategoryAPI {
+  final API _api = Get.find<APIController>().api;
+  final Log _logger = Log(appName: 'ProductionOrderListByCategoryAPI');
+  Logger get logger => _logger.logger;
+
+  //获取分类
+  Future<ResponseProduction?> getProductionOrderList({
+    ReqList? data,
+    ExtraRequestOptions? options,
+  }) async {
+    try {
+      final response = await _api.getWithRequestOptions(
+        APIPath.productListByCategory.kitchenPath,
+        queryParameters: data?.toJson(),
+      );
+      if (response.code.success) {
+        final result = await response.safeFromJson(
+          ResponseProduction.fromJson,
+          response.data,
+          modelName: 'ResponseProduction',
+          options: options,
+          logger: logger,
+        );
+        return result;
+      }
+      return null;
+    } catch (error, stackTrace) {
+      logger.severe('ResponseProduction Error:', error, stackTrace);
+      return null;
+    }
+  }
+}

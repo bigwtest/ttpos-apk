@@ -1,0 +1,217 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'zero_rule.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
+
+RequestZeroRule _$RequestZeroRuleFromJson(Map<String, dynamic> json) {
+  return _RequestZeroRule.fromJson(json);
+}
+
+/// @nodoc
+mixin _$RequestZeroRule {
+  @JsonKey(name: "sale_bill_uuid")
+  int get saleBillUuid => throw _privateConstructorUsedError;
+  @JsonKey(name: "sale_bill_uuid")
+  set saleBillUuid(int value) => throw _privateConstructorUsedError;
+  @JsonKey(name: "sale_order_uuid")
+  int get saleOrderUuid => throw _privateConstructorUsedError;
+  @JsonKey(name: "sale_order_uuid")
+  set saleOrderUuid(int value) => throw _privateConstructorUsedError;
+  @JsonKey(name: "zero_rule")
+  int get zeroRule => throw _privateConstructorUsedError;
+  @JsonKey(name: "zero_rule")
+  set zeroRule(int value) => throw _privateConstructorUsedError;
+
+  /// Serializes this RequestZeroRule to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of RequestZeroRule
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $RequestZeroRuleCopyWith<RequestZeroRule> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $RequestZeroRuleCopyWith<$Res> {
+  factory $RequestZeroRuleCopyWith(
+          RequestZeroRule value, $Res Function(RequestZeroRule) then) =
+      _$RequestZeroRuleCopyWithImpl<$Res, RequestZeroRule>;
+  @useResult
+  $Res call(
+      {@JsonKey(name: "sale_bill_uuid") int saleBillUuid,
+      @JsonKey(name: "sale_order_uuid") int saleOrderUuid,
+      @JsonKey(name: "zero_rule") int zeroRule});
+}
+
+/// @nodoc
+class _$RequestZeroRuleCopyWithImpl<$Res, $Val extends RequestZeroRule>
+    implements $RequestZeroRuleCopyWith<$Res> {
+  _$RequestZeroRuleCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of RequestZeroRule
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? saleBillUuid = null,
+    Object? saleOrderUuid = null,
+    Object? zeroRule = null,
+  }) {
+    return _then(_value.copyWith(
+      saleBillUuid: null == saleBillUuid
+          ? _value.saleBillUuid
+          : saleBillUuid // ignore: cast_nullable_to_non_nullable
+              as int,
+      saleOrderUuid: null == saleOrderUuid
+          ? _value.saleOrderUuid
+          : saleOrderUuid // ignore: cast_nullable_to_non_nullable
+              as int,
+      zeroRule: null == zeroRule
+          ? _value.zeroRule
+          : zeroRule // ignore: cast_nullable_to_non_nullable
+              as int,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$RequestZeroRuleImplCopyWith<$Res>
+    implements $RequestZeroRuleCopyWith<$Res> {
+  factory _$$RequestZeroRuleImplCopyWith(_$RequestZeroRuleImpl value,
+          $Res Function(_$RequestZeroRuleImpl) then) =
+      __$$RequestZeroRuleImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {@JsonKey(name: "sale_bill_uuid") int saleBillUuid,
+      @JsonKey(name: "sale_order_uuid") int saleOrderUuid,
+      @JsonKey(name: "zero_rule") int zeroRule});
+}
+
+/// @nodoc
+class __$$RequestZeroRuleImplCopyWithImpl<$Res>
+    extends _$RequestZeroRuleCopyWithImpl<$Res, _$RequestZeroRuleImpl>
+    implements _$$RequestZeroRuleImplCopyWith<$Res> {
+  __$$RequestZeroRuleImplCopyWithImpl(
+      _$RequestZeroRuleImpl _value, $Res Function(_$RequestZeroRuleImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of RequestZeroRule
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? saleBillUuid = null,
+    Object? saleOrderUuid = null,
+    Object? zeroRule = null,
+  }) {
+    return _then(_$RequestZeroRuleImpl(
+      saleBillUuid: null == saleBillUuid
+          ? _value.saleBillUuid
+          : saleBillUuid // ignore: cast_nullable_to_non_nullable
+              as int,
+      saleOrderUuid: null == saleOrderUuid
+          ? _value.saleOrderUuid
+          : saleOrderUuid // ignore: cast_nullable_to_non_nullable
+              as int,
+      zeroRule: null == zeroRule
+          ? _value.zeroRule
+          : zeroRule // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$RequestZeroRuleImpl implements _RequestZeroRule {
+  _$RequestZeroRuleImpl(
+      {@JsonKey(name: "sale_bill_uuid") required this.saleBillUuid,
+      @JsonKey(name: "sale_order_uuid") required this.saleOrderUuid,
+      @JsonKey(name: "zero_rule") required this.zeroRule});
+
+  factory _$RequestZeroRuleImpl.fromJson(Map<String, dynamic> json) =>
+      _$$RequestZeroRuleImplFromJson(json);
+
+  @override
+  @JsonKey(name: "sale_bill_uuid")
+  int saleBillUuid;
+  @override
+  @JsonKey(name: "sale_order_uuid")
+  int saleOrderUuid;
+  @override
+  @JsonKey(name: "zero_rule")
+  int zeroRule;
+
+  @override
+  String toString() {
+    return 'RequestZeroRule(saleBillUuid: $saleBillUuid, saleOrderUuid: $saleOrderUuid, zeroRule: $zeroRule)';
+  }
+
+  /// Create a copy of RequestZeroRule
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$RequestZeroRuleImplCopyWith<_$RequestZeroRuleImpl> get copyWith =>
+      __$$RequestZeroRuleImplCopyWithImpl<_$RequestZeroRuleImpl>(
+          this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$RequestZeroRuleImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _RequestZeroRule implements RequestZeroRule {
+  factory _RequestZeroRule(
+          {@JsonKey(name: "sale_bill_uuid") required int saleBillUuid,
+          @JsonKey(name: "sale_order_uuid") required int saleOrderUuid,
+          @JsonKey(name: "zero_rule") required int zeroRule}) =
+      _$RequestZeroRuleImpl;
+
+  factory _RequestZeroRule.fromJson(Map<String, dynamic> json) =
+      _$RequestZeroRuleImpl.fromJson;
+
+  @override
+  @JsonKey(name: "sale_bill_uuid")
+  int get saleBillUuid;
+  @JsonKey(name: "sale_bill_uuid")
+  set saleBillUuid(int value);
+  @override
+  @JsonKey(name: "sale_order_uuid")
+  int get saleOrderUuid;
+  @JsonKey(name: "sale_order_uuid")
+  set saleOrderUuid(int value);
+  @override
+  @JsonKey(name: "zero_rule")
+  int get zeroRule;
+  @JsonKey(name: "zero_rule")
+  set zeroRule(int value);
+
+  /// Create a copy of RequestZeroRule
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$RequestZeroRuleImplCopyWith<_$RequestZeroRuleImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
