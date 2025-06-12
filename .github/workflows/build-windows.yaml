@@ -1,0 +1,236 @@
+name: Build Windows
+
+env:
+  assistant_pack: assistant
+  kds_pack: kds
+  tablet_pack: tablet
+  pos_pack: pos
+  output_path: releases
+  # 中转服务器路径
+  scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/assistant/' || '/hitosea/ttpos-windows/Test/assistant/' }}
+  scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/kds/' || '/hitosea/ttpos-windows/Test/kds/' }}
+  scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/tablet/' || '/hitosea/ttpos-windows/Test/tablet/' }}
+  scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/pos/' || '/hitosea/ttpos-windows/Test/pos/' }}
+  # 最终下载路径
+  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Assistant/' }}
+  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Kitchen/' }}
+  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Menu/' }}
+  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Cashier/' }}
+
+on:
+  # push:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'apps/**'
+  #     - 'packages/**'
+  #     - '.github/workflows/build_windows.yml'
+  # pull_request:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'apps/**'
+  #     - 'packages/**'
+  #     - '.github/workflows/build_windows.yml'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "选择构建分支"
+        required: true
+        type: choice
+        options:
+          - "new-test"
+          - "release"
+      build_type:
+        description: "选择构建类型"
+        required: true
+        type: choice
+        options:
+          - "all"
+          - "single"
+      package_name:
+        description: "选择要构建的包（仅在构建类型为 single 时生效）"
+        required: false
+        type: choice
+        options:
+          - pos
+          - kds
+          - assistant
+          - tablet
+      base_url:
+        description: "选择API基础URL"
+        required: true
+        type: choice
+        options:
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "选择WebSocket基础URL"
+        required: true
+        type: choice
+        options:
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
+      scp:
+        description: "是否启用SCP传输"
+        required: true
+        default: "off"
+        type: choice
+        options:
+          - "on"
+          - "off"
+
+jobs:
+  prepare:
+    runs-on: windows-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix
+        id: set-matrix
+        shell: pwsh
+        run: |
+          $packages = if ('${{ github.event.inputs.build_type }}' -eq 'single') {
+            @('${{ github.event.inputs.package_name }}')
+          } else {
+            @('pos', 'kds', 'assistant', 'tablet')
+          }
+          $matrix = @{
+            include = $packages | ForEach-Object { @{ package_name = $_ } }
+          } | ConvertTo-Json -Compress
+          "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+  build:
+    needs: prepare
+    runs-on: windows-latest
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart --version
+          dart pub global activate melos
+
+      - name: Melos init config
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+
+      - name: Config API_BASE_URL
+        run: |
+          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
+          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
+          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
+          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
+          Get-Content apps/${{ matrix.package_name }}/.env.production.local
+
+      - name: Set environment variables
+        run: |
+          $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
+          $version = (Get-Content apps/${{ matrix.package_name }}/pubspec.yaml | Select-String 'version:' | ForEach-Object { $_.Line.Split(':')[1].Trim() }).Split('+')[0]
+          $env:MELOS_PACKAGE_VERSION = $version
+          echo "MELOS_PACKAGE_NAME=$env:MELOS_PACKAGE_NAME" >> $env:GITHUB_ENV
+          echo "MELOS_PACKAGE_VERSION=$env:MELOS_PACKAGE_VERSION" >> $env:GITHUB_ENV
+
+      - name: Build Windows
+        run: |
+          # 记录项目根目录
+          $rootDir = $PWD
+          Write-Host "项目根目录: $rootDir"
+
+          # 进入应用目录
+          $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
+          if (-not (Test-Path $appDir)) {
+            Write-Error "应用目录不存在: $appDir"
+            exit 1
+          }
+          Set-Location $appDir
+          Write-Host "当前应用目录: $PWD"
+          Write-Host "应用目录内容:"
+          Get-ChildItem -Path $PWD -Recurse -Depth 1
+
+          # 执行构建脚本（从项目根目录）
+          $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
+          if (-not (Test-Path $scriptPath)) {
+            Write-Error "构建脚本不存在: $scriptPath"
+            exit 1
+          }
+          Write-Host "脚本路径: $scriptPath"
+
+          # 设置错误处理
+          $ErrorActionPreference = 'Continue'
+          try {
+            # 执行 Flutter 构建
+            Write-Host "开始 Flutter 构建..."
+            flutter build windows --dart-define-from-file=.env.production.local
+            
+            # 执行构建脚本
+            Write-Host "开始执行构建脚本..."
+            & $scriptPath
+
+            # 检查构建结果
+            $releaseDir = Join-Path $rootDir "releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION"
+            if (Test-Path $releaseDir) {
+              Write-Host "构建完成，发布目录内容:"
+              Get-ChildItem -Path $releaseDir
+            } else {
+              Write-Error "发布目录不存在: $releaseDir"
+              exit 1
+            }
+          }
+          catch {
+            Write-Error "构建过程中出错: $_"
+            Write-Host "错误详情:"
+            $_.Exception | Format-List -Force
+            Write-Host "调用堆栈:"
+            $_.ScriptStackTrace
+            exit 1
+          }
+          finally {
+            # 恢复错误处理设置
+            $ErrorActionPreference = 'Stop'
+          }
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            scp ${{ env[format('scp_s_{0}', matrix.package_name)] }}*.zip ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.package_name)] }}
+          sourceFiles: |
+            ${{ env.output_path }}/${{ matrix.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}/*.zip
+          targetDir: ${{ env[format('scp_s_{0}', matrix.package_name)] }}
+          scpFirst: true
+
+      - name: Create Release
+        if: github.event.inputs.branch == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            releases/${{ env.MELOS_PACKAGE_NAME }}/${{ env.MELOS_PACKAGE_VERSION }}/*.zip
+          tag_name: v${{ env.MELOS_PACKAGE_VERSION }}
+          name: Release ${{ env.MELOS_PACKAGE_NAME }} v${{ env.MELOS_PACKAGE_VERSION }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

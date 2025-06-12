@@ -1,0 +1,177 @@
+name:  TR ALL
+ 
+#构建所有apk，上传APK到google存储桶和中转服务器。然后从中转服务器SCP各端APK包到官网的downloads目录
+env:
+  assistant_pack: assistant
+  kds_pack: kds
+  tablet_pack: tablet
+  pos_pack: pos
+  apk_output_path: releases
+  assistant_path: dc_apk/TTPOS/TR-Demo/Assistant/
+  kds_path: dc_apk/TTPOS/TR-Demo/Kitchen/
+  tablet_path: dc_apk/TTPOS/TR-Demo/Menu/
+  pos_path: dc_apk/TTPOS/TR-Demo/Cashier/
+  #中转服务器路径
+  scp_s_assistant: /hitosea/ttpos-apk/Test/assistant/
+  scp_s_kds: /hitosea/ttpos-apk/Test/kds/
+  scp_s_tablet: /hitosea/ttpos-apk/Test/tablet/
+  scp_s_pos: /hitosea/ttpos-apk/Test/pos/
+  #最终下载路径：www.ttpos.com/downloads
+  scp_d_assistant: /root/web/web/restant/out/downloads/TR-Demo/Assistant/
+  scp_d_kds: /root/web/web/restant/out/downloads/TR-Demo/Kitchen/
+  scp_d_tablet: /root/web/web/restant/out/downloads/TR-Demo/Menu/
+  scp_d_pos: /root/web/web/restant/out/downloads/TR-Demo/Cashier/
+on:
+  workflow_dispatch:
+    inputs:
+      branch: 
+        description: 'branch (e.g., release)'
+        required: true
+        #default: 'release'
+        type: choice
+        options:
+          - 'release'
+          - 'new-test'
+      base_url: 
+        description: 'base_url (e.g., base_url)'
+        required: true
+        #default: 'https://api.ttpos.com/api/v1'
+        type: choice
+        options:
+          - 'http://172.20.171.88/api/v1'
+      base_ws_url: 
+        description: 'base_ws_url (e.g., base_ws_url)'
+        required: true
+        #default: 'wss://api.ttpos.com/ws'
+        type: choice
+        options:
+          - 'ws://172.20.171.88/ws'
+      scp: 
+        description: 'scp (on/off)'
+        required: true
+        default: 'off'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        apk_path_name: [ assistant,kds,tablet,pos ]
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+      #环境
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+            channel: stable
+            cache: true
+            flutter-version: '3.27.3'
+    
+      - name: Install Melos
+        run: |
+            flutter --version
+            dart pub global activate melos
+    
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+            distribution: 'temurin'
+            java-version: '17'
+            cache: 'gradle'
+
+      - name: Melos init config
+        env: 
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+            melos run init
+            melos bs
+       
+      - name: Config API_BASE_URL
+        if: matrix.apk_path_name == 'assistant'
+        id: assistant_config
+        run: |
+            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/assistant/.env.production.local 
+            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/assistant/.env.production.local
+            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_ASSISTANT }}|' apps/assistant/.env.production.local
+            cat ./apps/assistant/.env.production.local
+            
+      - name: Config API_BASE_URL
+        if: matrix.apk_path_name == 'kds'
+        id: kds_config
+        run: |
+            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/kds/.env.production.local 
+            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/kds/.env.production.local
+            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_KDS }}|' apps/kds/.env.production.local 
+            cat ./apps/assistant/.env.production.local
+            
+      - name: Config API_BASE_URL
+        if: matrix.apk_path_name == 'tablet'
+        id: tablet_config
+        run: |
+            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/tablet/.env.production.local
+            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/tablet/.env.production.local
+            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_TABLET }}|' apps/tablet/.env.production.local
+            cat ./apps/assistant/.env.production.local
+            
+      - name: Config API_BASE_URL
+        if: matrix.apk_path_name == 'pos'
+        id: pos_config
+        run: |
+            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/pos/.env.production.local 
+            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/pos/.env.production.local
+            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_POS }}|' apps/pos/.env.production.local
+            cat ./apps/pos/.env.production.local
+      
+      - name: Build ASSISTANT APK
+        if: matrix.apk_path_name == 'assistant'  
+        run: |
+            bash -x ./scripts/build_android.sh assistant
+            version_num=`awk '/version:/ {print $2}' apps/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/pubspec.yaml | cut -d'+' -f1`
+            mv /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/TTPOS-Assistant-V${version_num}.apk
+      - name: Build KDS APK
+        if: matrix.apk_path_name == 'kds'  
+        run: |
+            bash -x ./scripts/build_android.sh kds
+            version_num=`awk '/version:/ {print $2}' apps/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/pubspec.yaml | cut -d'+' -f1`
+            mv /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/TTPOS-Kitchen-V${version_num}.apk
+     
+      - name: Build Tablet APK
+        if: matrix.apk_path_name == 'tablet'  
+        run: |
+            bash -x ./scripts/build_android.sh tablet
+            version_num=`awk '/version:/ {print $2}' apps/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/pubspec.yaml | cut -d'+' -f1`
+            mv /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/TTPOS-Menu-V${version_num}.apk
+      - name: Build POS APK
+        if: matrix.apk_path_name == 'pos'
+        run: |
+            bash -x ./scripts/build_android.sh pos
+            version_num=`awk '/version:/ {print $2}' apps/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/pubspec.yaml | cut -d'+' -f1`
+            mv /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk /home/runner/work/ttpos-flutter/ttpos-flutter/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/TTPOS-Cashier-V${version_num}.apk
+    
+      - uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}'  
+
+      - id: 'upload-files'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
+        with:
+          path: ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}
+          destination: ${{ env[format('{0}_path', matrix.apk_path_name)] }} 
+          parent: false
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            scp ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}*.apk ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
+          sourceFiles: |
+            ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk
+          targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
+          scpFirst: true       
