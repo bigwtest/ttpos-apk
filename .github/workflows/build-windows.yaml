@@ -112,26 +112,26 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
-      # - name: Setup Flutter
-      #   uses: subosito/flutter-action@v2
-      #   with:
-      #     flutter-version: '3.27.3'
-      #     channel: 'stable'
-      #     cache: true
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.3'
+          channel: 'stable'
+          cache: true
 
-      # - name: Install Melos
-      #   run: |
-      #     flutter --version
-      #     dart --version
-      #     dart pub global activate melos
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart --version
+          dart pub global activate melos
 
-      # - name: Melos init config
-      #   env:
-      #     PUB_HOSTED_URL: https://pub.flutter-io.cn
-      #     FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
-      #   run: |
-      #     melos run init
-      #     melos bs
+      - name: Melos init config
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
 
       - name: Config API_BASE_URL
         shell: pwsh
