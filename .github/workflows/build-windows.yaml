@@ -112,28 +112,29 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.27.3'
-          channel: 'stable'
-          cache: true
+      # - name: Setup Flutter
+      #   uses: subosito/flutter-action@v2
+      #   with:
+      #     flutter-version: '3.27.3'
+      #     channel: 'stable'
+      #     cache: true
 
-      - name: Install Melos
-        run: |
-          flutter --version
-          dart --version
-          dart pub global activate melos
+      # - name: Install Melos
+      #   run: |
+      #     flutter --version
+      #     dart --version
+      #     dart pub global activate melos
 
-      - name: Melos init config
-        env:
-          PUB_HOSTED_URL: https://pub.flutter-io.cn
-          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
-        run: |
-          melos run init
-          melos bs
+      # - name: Melos init config
+      #   env:
+      #     PUB_HOSTED_URL: https://pub.flutter-io.cn
+      #     FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+      #   run: |
+      #     melos run init
+      #     melos bs
 
       - name: Config API_BASE_URL
+        shell: pwsh
         run: |
           Write-Host "配置环境变量..."
           Write-Host "base_url: ${{ github.event.inputs.base_url }}"
@@ -161,24 +162,45 @@ jobs:
           }
           
           Write-Host "更新环境文件: $envFile"
-          $content = Get-Content $envFile -Raw
-          $content = $content -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL"
-          $content = $content -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL"
-          $content | Set-Content $envFile
+          
+          # 读取文件内容
+          $lines = Get-Content $envFile
+          $newLines = @()
+          
+          # 处理每一行
+          foreach ($line in $lines) {
+            if ($line -match '^API_BASE_URL=') {
+              $newLines += "API_BASE_URL=$env:API_BASE_URL"
+            }
+            elseif ($line -match '^WS_BASE_URL=') {
+              $newLines += "WS_BASE_URL=$env:WS_BASE_URL"
+            }
+            else {
+              $newLines += $line
+            }
+          }
+          
+          # 写入新内容
+          $newLines | Set-Content $envFile -Encoding UTF8
           
           Write-Host "环境文件内容:"
           Get-Content $envFile
           
           # 验证更新
-          $updatedContent = Get-Content $envFile -Raw
-          if (-not ($updatedContent -match "API_BASE_URL=$env:API_BASE_URL")) {
-            Write-Error "API_BASE_URL 更新失败"
+          $updatedContent = Get-Content $envFile
+          $apiLine = $updatedContent | Where-Object { $_ -match '^API_BASE_URL=' }
+          $wsLine = $updatedContent | Where-Object { $_ -match '^WS_BASE_URL=' }
+          
+          if (-not ($apiLine -eq "API_BASE_URL=$env:API_BASE_URL")) {
+            Write-Error "API_BASE_URL 更新失败，当前值: $apiLine"
             exit 1
           }
-          if (-not ($updatedContent -match "WS_BASE_URL=$env:WS_BASE_URL")) {
-            Write-Error "WS_BASE_URL 更新失败"
+          if (-not ($wsLine -eq "WS_BASE_URL=$env:WS_BASE_URL")) {
+            Write-Error "WS_BASE_URL 更新失败，当前值: $wsLine"
             exit 1
           }
+          
+          Write-Host "环境变量更新成功"
 
       - name: Build Windows
         run: |
