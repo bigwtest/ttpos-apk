@@ -102,7 +102,7 @@ jobs:
 
   build:
     needs: prepare
-    runs-on: windows-2022
+    runs-on: windows-lastest
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
@@ -112,18 +112,41 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
-      - name: Setup Flutter Windows Environment
-        uses: invertase/flutter-windows-action@v1
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.27.3'
           channel: 'stable'
           cache: true
-          cache-key: flutter-windows-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
-          cache-path: ${{ github.workspace }}/.pub-cache
-          visual-studio: '2022'
-          visual-studio-workloads: 'Microsoft.VisualStudio.Workload.VCTools;Microsoft.VisualStudio.Component.Windows10SDK.19041;Microsoft.VisualStudio.Component.CMake.Project'
-          cmake: true
-          ninja: true
+
+      - name: Install Windows Build Tools
+        shell: pwsh
+        run: |
+          # 安装 Chocolatey
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          
+          # 刷新环境变量
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          
+          # 安装 Visual Studio 2022 构建工具
+          Write-Host "Installing Visual Studio Build Tools..."
+          $vsInstallerUrl = "https://aka.ms/vs/17/release/vs_buildtools.exe"
+          $vsInstallerExe = "$env:TEMP\vs_buildtools.exe"
+          Invoke-WebRequest -Uri $vsInstallerUrl -OutFile $vsInstallerExe
+          Start-Process -FilePath $vsInstallerExe -ArgumentList "--quiet", "--wait", "--norestart", "--nocache", `
+            "--installPath", "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools", `
+            "--add", "Microsoft.VisualStudio.Workload.VCTools", `
+            "--add", "Microsoft.VisualStudio.Component.Windows10SDK.19041", `
+            "--add", "Microsoft.VisualStudio.Component.CMake.Project" -Wait
+          
+          # 安装 CMake 和 Ninja
+          Write-Host "Installing CMake and Ninja..."
+          choco install cmake ninja --yes --no-progress
+          
+          # 刷新环境变量
+          refreshenv
 
       - name: Install Melos
         run: |
@@ -169,26 +192,19 @@ jobs:
           }
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
-          Write-Host "应用目录内容:"
-          Get-ChildItem -Path $PWD -Recurse -Depth 1
 
-          # 执行构建脚本（从项目根目录）
+          # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
             Write-Error "构建脚本不存在: $scriptPath"
             exit 1
           }
-          Write-Host "脚本路径: $scriptPath"
+          Write-Host "开始执行构建脚本: $scriptPath"
 
           # 设置错误处理
           $ErrorActionPreference = 'Continue'
           try {
-            # 执行 Flutter 构建
-            Write-Host "开始 Flutter 构建..."
-            flutter build windows --dart-define-from-file=.env.production.local
-            
             # 执行构建脚本
-            Write-Host "开始执行构建脚本..."
             & $scriptPath
 
             # 检查构建结果
