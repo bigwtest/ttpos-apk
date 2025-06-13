@@ -260,6 +260,12 @@ jobs:
             $content = $content -replace "std::experimental::coroutine_handle", "std::coroutine_handle"
             $content = $content -replace "std::experimental::suspend_never", "std::suspend_never"
             $content = $content -replace "std::experimental::suspend_always", "std::suspend_always"
+            $content = $content -replace "std::experimental::coroutine_traits", "std::coroutine_traits"
+            $content = $content -replace "std::experimental::noop_coroutine", "std::noop_coroutine"
+            $content = $content -replace "std::experimental::noop_coroutine_handle", "std::noop_coroutine_handle"
+            $content = $content -replace "std::experimental::noop_coroutine_promise", "std::noop_coroutine_promise"
+            $content = $content -replace "std::experimental::noop_coroutine_handle<void>", "std::noop_coroutine_handle<void>"
+            $content = $content -replace "std::experimental::noop_coroutine_handle<.*>", "std::noop_coroutine_handle<void>"
             $content | Set-Content $audioPlayersCpp -Encoding UTF8
           }
           
@@ -299,6 +305,13 @@ jobs:
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
@@ -367,7 +380,7 @@ jobs:
             $content | Set-Content $screenRetrieverCpp -Encoding UTF8
           }
           
-          # 修复 flutter_secure_storage_windows 插件的类型转换问题
+          # 修复 flutter_secure_storage_windows 插件的预处理器命令问题
           $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
           if (Test-Path $secureStorageCpp) {
             Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
@@ -388,7 +401,51 @@ jobs:
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
             $content | Set-Content $secureStorageCpp -Encoding UTF8
+          }
+          
+          # 修复 screen_retriever_windows 插件的 c_api 文件
+          $screenRetrieverCApi = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin_c_api.cpp"
+          if (Test-Path $screenRetrieverCApi) {
+            Write-Host "修复 screen_retriever_windows_plugin_c_api.cpp..."
+            $content = Get-Content $screenRetrieverCApi -Raw
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+            $content | Set-Content $screenRetrieverCApi -Encoding UTF8
           }
           
           Write-Host "Windows 插件修复完成"
