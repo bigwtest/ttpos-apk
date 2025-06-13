@@ -268,6 +268,15 @@ jobs:
           $rootDir = $PWD
           Write-Host "项目根目录: $rootDir"
           
+          # 进入应用目录
+          $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
+          if (-not (Test-Path $appDir)) {
+            Write-Error "应用目录不存在: $appDir"
+            exit 1
+          }
+          Set-Location $appDir
+          Write-Host "当前应用目录: $PWD"
+          
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
