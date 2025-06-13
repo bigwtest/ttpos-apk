@@ -111,12 +111,6 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.11.1'
-          cache: 'npm'
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
