@@ -37,7 +37,7 @@ on:
           - "wss://ttpos-pro.keli.vip/ws"
 
 env:
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.27.3"
   ANDROID_FLUTTER_VERSION: "3.24.5"
   FLUTTER_ELINUX_VERSION: "3.16.9"
   PUB_HOSTED_URL: "https://pub.flutter-io.cn"
