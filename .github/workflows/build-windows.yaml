@@ -229,6 +229,26 @@ jobs:
           # 修复 Windows 插件编译问题
           Write-Host "修复 Windows 插件编译问题..."
           
+          # 修复 flutter_tts 插件的 CMakeLists.txt
+          $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
+          if (Test-Path $ttsCmakeFile) {
+            Write-Host "修复 flutter_tts CMakeLists.txt..."
+            $content = Get-Content $ttsCmakeFile -Raw
+            
+            # 修复 install 命令语法
+            $content = $content -replace "install\s+TARGETS", "install(TARGETS"
+            $content = $content -replace "install\s+FILES", "install(FILES"
+            $content = $content -replace "install\s+DIRECTORY", "install(DIRECTORY"
+            
+            # 添加缺失的右括号
+            $content = $content -replace "install\(TARGETS([^)]*)\)", "install(TARGETS$1)"
+            $content = $content -replace "install\(FILES([^)]*)\)", "install(FILES$1)"
+            $content = $content -replace "install\(DIRECTORY([^)]*)\)", "install(DIRECTORY$1)"
+            
+            $content | Set-Content $ttsCmakeFile -Encoding UTF8
+            Write-Host "已修复 flutter_tts CMakeLists.txt"
+          }
+          
           # 修复 window_manager 插件
           $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
           if (Test-Path $windowManagerCpp) {
