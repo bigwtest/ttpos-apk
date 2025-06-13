@@ -270,6 +270,10 @@ jobs:
             $content = Get-Content $windowManagerCpp -Raw
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
             $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
             $content | Set-Content $windowManagerCpp -Encoding UTF8
           }
           
@@ -282,7 +286,27 @@ jobs:
             $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
             $content | Set-Content $screenRetrieverH -Encoding UTF8
+          }
+          
+          # 修复 screen_retriever_windows 插件的 cpp 文件
+          $screenRetrieverCpp = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.cpp"
+          if (Test-Path $screenRetrieverCpp) {
+            Write-Host "修复 screen_retriever_windows_plugin.cpp..."
+            $content = Get-Content $screenRetrieverCpp -Raw
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content | Set-Content $screenRetrieverCpp -Encoding UTF8
           }
           
           # 修复 flutter_secure_storage_windows 插件的类型转换问题
@@ -295,6 +319,10 @@ jobs:
             $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
             $content | Set-Content $secureStorageCpp -Encoding UTF8
           }
           
