@@ -36,6 +36,13 @@ on:
           - "wss://api.ttpos.com/ws"
           - "wss://ttpos-pro.keli.vip/ws"
 
+env:
+  FLUTTER_VERSION: "3.24.5"
+  ANDROID_FLUTTER_VERSION: "3.24.5"
+  FLUTTER_ELINUX_VERSION: "3.16.9"
+  PUB_HOSTED_URL: "https://pub.flutter-io.cn"
+  FLUTTER_STORAGE_BASE_URL: "https://storage.flutter-io.cn"
+
 jobs:
   build:
     runs-on: windows-latest
@@ -45,12 +52,20 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.12.0
         with:
-          flutter-version: '3.27.3'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+
+      - name: Patch flutter
+        shell: bash
+        run: |
+          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cd $(dirname $(dirname $(which flutter)))
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Install Melos
         run: |
@@ -59,8 +74,8 @@ jobs:
 
       - name: Melos init config
         env:
-          PUB_HOSTED_URL: https://pub.flutter-io.cn
-          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+          PUB_HOSTED_URL: ${{ env.PUB_HOSTED_URL }}
+          FLUTTER_STORAGE_BASE_URL: ${{ env.FLUTTER_STORAGE_BASE_URL }}
         run: |
           melos run init
           melos bs
@@ -115,30 +130,6 @@ jobs:
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
           
-          # 重新生成 Windows 项目
-          Write-Host "重新生成 Windows 项目..."
-          flutter create . --platforms=windows
-          
-          # 修复 flutter_tts 插件的 CMakeLists.txt
-          $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
-          if (Test-Path $ttsCmakeFile) {
-            Write-Host "修复 flutter_tts CMakeLists.txt 文件"
-            $content = Get-Content $ttsCmakeFile -Raw
-            $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
-            $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
-            $content = $content.Replace($oldCommand, $newCommand)
-            $content | Set-Content $ttsCmakeFile -Encoding UTF8
-          }
-          
-          # 设置 C++ 版本
-          $cmakeFile = "windows\CMakeLists.txt"
-          if (Test-Path $cmakeFile) {
-            Write-Host "设置 C++ 版本..."
-            $content = Get-Content $cmakeFile -Raw
-            # 在 project 命令后添加 C++ 版本设置
-            $content = $content -replace "(project\(.*?\))", "`$1`nset(CMAKE_CXX_STANDARD 17)`nset(CMAKE_CXX_STANDARD_REQUIRED ON)"
-            $content | Set-Content $cmakeFile -Encoding UTF8
-          }
           
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
