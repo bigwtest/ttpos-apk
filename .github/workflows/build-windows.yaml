@@ -257,6 +257,9 @@ jobs:
             Write-Host "修复 audioplayers_windows_plugin.cpp..."
             $content = Get-Content $audioPlayersCpp -Raw
             $content = $content -replace "#include <experimental/coroutine>", "#include <coroutine>"
+            $content = $content -replace "std::experimental::coroutine_handle", "std::coroutine_handle"
+            $content = $content -replace "std::experimental::suspend_never", "std::suspend_never"
+            $content = $content -replace "std::experimental::suspend_always", "std::suspend_always"
             $content | Set-Content $audioPlayersCpp -Encoding UTF8
           }
           
@@ -266,6 +269,7 @@ jobs:
             Write-Host "修复 window_manager.cpp..."
             $content = Get-Content $windowManagerCpp -Raw
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
             $content | Set-Content $windowManagerCpp -Encoding UTF8
           }
           
@@ -275,6 +279,9 @@ jobs:
             Write-Host "修复 screen_retriever_windows_plugin.h..."
             $content = Get-Content $screenRetrieverH -Raw
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
             $content | Set-Content $screenRetrieverH -Encoding UTF8
           }
           
@@ -285,6 +292,9 @@ jobs:
             $content = Get-Content $secureStorageCpp -Raw
             $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
             $content | Set-Content $secureStorageCpp -Encoding UTF8
           }
           
