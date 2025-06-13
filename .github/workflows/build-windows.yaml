@@ -198,257 +198,257 @@ jobs:
           }
           
           Write-Host "环境变量更新成功"
-      - name: Prepare Windows Build
-        shell: pwsh
-        run: |
-          $rootDir = $PWD
-          Write-Host "项目根目录: $rootDir"
+      # - name: Prepare Windows Build
+      #   shell: pwsh
+      #   run: |
+      #     $rootDir = $PWD
+      #     Write-Host "项目根目录: $rootDir"
           
-          $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
-          if (-not (Test-Path $appDir)) {
-            Write-Error "应用目录不存在: $appDir"
-            exit 1
-          }
-          Set-Location $appDir
-          Write-Host "当前应用目录: $PWD"
+      #     $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
+      #     if (-not (Test-Path $appDir)) {
+      #       Write-Error "应用目录不存在: $appDir"
+      #       exit 1
+      #     }
+      #     Set-Location $appDir
+      #     Write-Host "当前应用目录: $PWD"
           
-          Write-Host "清理项目..."
-          flutter clean
+      #     Write-Host "清理项目..."
+      #     flutter clean
           
-          Write-Host "获取依赖..."
-          flutter pub get
+      #     Write-Host "获取依赖..."
+      #     flutter pub get
           
-          Write-Host "重新生成 Windows 项目..."
-          flutter create . --platforms=windows
+      #     Write-Host "重新生成 Windows 项目..."
+      #     flutter create . --platforms=windows
           
-          Write-Host "修复 Windows 插件编译问题..."
+      #     Write-Host "修复 Windows 插件编译问题..."
           
-          # 修复 flutter_tts 插件的 CMakeLists.txt
-          $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
-          if (Test-Path $ttsCmakeFile) {
-            Write-Host "找到 flutter_tts CMakeLists.txt 文件"
-            Write-Host "原始文件内容:"
-            Write-Host "----------------------------------------"
-            Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
-            Write-Host "----------------------------------------"
+      #     # 修复 flutter_tts 插件的 CMakeLists.txt
+      #     $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
+      #     if (Test-Path $ttsCmakeFile) {
+      #       Write-Host "找到 flutter_tts CMakeLists.txt 文件"
+      #       Write-Host "原始文件内容:"
+      #       Write-Host "----------------------------------------"
+      #       Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
+      #       Write-Host "----------------------------------------"
             
-            Write-Host "开始修复 CMakeLists.txt..."
+      #       Write-Host "开始修复 CMakeLists.txt..."
             
-            $content = Get-Content $ttsCmakeFile -Raw
-            $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
-            $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
+      #       $content = Get-Content $ttsCmakeFile -Raw
+      #       $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
+      #       $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
             
-            $content = $content.Replace($oldCommand, $newCommand)
-            $content | Set-Content $ttsCmakeFile -Encoding UTF8
+      #       $content = $content.Replace($oldCommand, $newCommand)
+      #       $content | Set-Content $ttsCmakeFile -Encoding UTF8
             
-            Write-Host "修复后的文件内容:"
-            Write-Host "----------------------------------------"
-            Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
-            Write-Host "----------------------------------------"
-          } else {
-            Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
-            Write-Host "当前目录结构:"
-            Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
-          }
+      #       Write-Host "修复后的文件内容:"
+      #       Write-Host "----------------------------------------"
+      #       Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
+      #       Write-Host "----------------------------------------"
+      #     } else {
+      #       Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
+      #       Write-Host "当前目录结构:"
+      #       Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
+      #     }
           
-          # 修复 audioplayers_windows 插件的协程问题
-          $audioPlayersCpp = "windows\flutter\ephemeral\.plugin_symlinks\audioplayers_windows\windows\audioplayers_windows_plugin.cpp"
-          if (Test-Path $audioPlayersCpp) {
-            Write-Host "修复 audioplayers_windows_plugin.cpp..."
-            $content = Get-Content $audioPlayersCpp -Raw
-            $content = $content -replace "#include <experimental/coroutine>", "#include <coroutine>"
-            $content = $content -replace "std::experimental::coroutine_handle", "std::coroutine_handle"
-            $content = $content -replace "std::experimental::suspend_never", "std::suspend_never"
-            $content = $content -replace "std::experimental::suspend_always", "std::suspend_always"
-            $content = $content -replace "std::experimental::coroutine_traits", "std::coroutine_traits"
-            $content = $content -replace "std::experimental::noop_coroutine", "std::noop_coroutine"
-            $content = $content -replace "std::experimental::noop_coroutine_handle", "std::noop_coroutine_handle"
-            $content = $content -replace "std::experimental::noop_coroutine_promise", "std::noop_coroutine_promise"
-            $content = $content -replace "std::experimental::noop_coroutine_handle<void>", "std::noop_coroutine_handle<void>"
-            $content = $content -replace "std::experimental::noop_coroutine_handle<.*>", "std::noop_coroutine_handle<void>"
-            $content | Set-Content $audioPlayersCpp -Encoding UTF8
-          }
+      #     # 修复 audioplayers_windows 插件的协程问题
+      #     $audioPlayersCpp = "windows\flutter\ephemeral\.plugin_symlinks\audioplayers_windows\windows\audioplayers_windows_plugin.cpp"
+      #     if (Test-Path $audioPlayersCpp) {
+      #       Write-Host "修复 audioplayers_windows_plugin.cpp..."
+      #       $content = Get-Content $audioPlayersCpp -Raw
+      #       $content = $content -replace "#include <experimental/coroutine>", "#include <coroutine>"
+      #       $content = $content -replace "std::experimental::coroutine_handle", "std::coroutine_handle"
+      #       $content = $content -replace "std::experimental::suspend_never", "std::suspend_never"
+      #       $content = $content -replace "std::experimental::suspend_always", "std::suspend_always"
+      #       $content = $content -replace "std::experimental::coroutine_traits", "std::coroutine_traits"
+      #       $content = $content -replace "std::experimental::noop_coroutine", "std::noop_coroutine"
+      #       $content = $content -replace "std::experimental::noop_coroutine_handle", "std::noop_coroutine_handle"
+      #       $content = $content -replace "std::experimental::noop_coroutine_promise", "std::noop_coroutine_promise"
+      #       $content = $content -replace "std::experimental::noop_coroutine_handle<void>", "std::noop_coroutine_handle<void>"
+      #       $content = $content -replace "std::experimental::noop_coroutine_handle<.*>", "std::noop_coroutine_handle<void>"
+      #       $content | Set-Content $audioPlayersCpp -Encoding UTF8
+      #     }
           
-          # 修复 window_manager 插件的成员函数声明
-          $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
-          if (Test-Path $windowManagerCpp) {
-            Write-Host "修复 window_manager.cpp..."
-            $content = Get-Content $windowManagerCpp -Raw
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content | Set-Content $windowManagerCpp -Encoding UTF8
-          }
+      #     # 修复 window_manager 插件的成员函数声明
+      #     $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
+      #     if (Test-Path $windowManagerCpp) {
+      #       Write-Host "修复 window_manager.cpp..."
+      #       $content = Get-Content $windowManagerCpp -Raw
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content | Set-Content $windowManagerCpp -Encoding UTF8
+      #     }
           
-          # 修复 screen_retriever_windows 插件的成员函数声明
-          $screenRetrieverH = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.h"
-          if (Test-Path $screenRetrieverH) {
-            Write-Host "修复 screen_retriever_windows_plugin.h..."
-            $content = Get-Content $screenRetrieverH -Raw
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content | Set-Content $screenRetrieverH -Encoding UTF8
-          }
+      #     # 修复 screen_retriever_windows 插件的成员函数声明
+      #     $screenRetrieverH = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.h"
+      #     if (Test-Path $screenRetrieverH) {
+      #       Write-Host "修复 screen_retriever_windows_plugin.h..."
+      #       $content = Get-Content $screenRetrieverH -Raw
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content | Set-Content $screenRetrieverH -Encoding UTF8
+      #     }
           
-          # 修复 screen_retriever_windows 插件的 cpp 文件
-          $screenRetrieverCpp = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.cpp"
-          if (Test-Path $screenRetrieverCpp) {
-            Write-Host "修复 screen_retriever_windows_plugin.cpp..."
-            $content = Get-Content $screenRetrieverCpp -Raw
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content | Set-Content $screenRetrieverCpp -Encoding UTF8
-          }
+      #     # 修复 screen_retriever_windows 插件的 cpp 文件
+      #     $screenRetrieverCpp = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.cpp"
+      #     if (Test-Path $screenRetrieverCpp) {
+      #       Write-Host "修复 screen_retriever_windows_plugin.cpp..."
+      #       $content = Get-Content $screenRetrieverCpp -Raw
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content | Set-Content $screenRetrieverCpp -Encoding UTF8
+      #     }
           
-          # 修复 flutter_secure_storage_windows 插件的预处理器命令问题
-          $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
-          if (Test-Path $secureStorageCpp) {
-            Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
-            $content = Get-Content $secureStorageCpp -Raw
-            $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content | Set-Content $secureStorageCpp -Encoding UTF8
-          }
+      #     # 修复 flutter_secure_storage_windows 插件的预处理器命令问题
+      #     $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
+      #     if (Test-Path $secureStorageCpp) {
+      #       Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
+      #       $content = Get-Content $secureStorageCpp -Raw
+      #       $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content | Set-Content $secureStorageCpp -Encoding UTF8
+      #     }
           
-          # 修复 screen_retriever_windows 插件的 c_api 文件
-          $screenRetrieverCApi = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin_c_api.cpp"
-          if (Test-Path $screenRetrieverCApi) {
-            Write-Host "修复 screen_retriever_windows_plugin_c_api.cpp..."
-            $content = Get-Content $screenRetrieverCApi -Raw
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-            $content | Set-Content $screenRetrieverCApi -Encoding UTF8
-          }
+      #     # 修复 screen_retriever_windows 插件的 c_api 文件
+      #     $screenRetrieverCApi = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin_c_api.cpp"
+      #     if (Test-Path $screenRetrieverCApi) {
+      #       Write-Host "修复 screen_retriever_windows_plugin_c_api.cpp..."
+      #       $content = Get-Content $screenRetrieverCApi -Raw
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
+      #       $content | Set-Content $screenRetrieverCApi -Encoding UTF8
+      #     }
           
-          Write-Host "Windows 插件修复完成"
+      #     Write-Host "Windows 插件修复完成"
 
       - name: Build Windows
         shell: pwsh
