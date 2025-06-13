@@ -226,29 +226,41 @@ jobs:
           Write-Host "重新生成 Windows 项目..."
           flutter create . --platforms=windows
           
-          # 修复 flutter_tts Windows 构建问题
-          Write-Host "修复 flutter_tts Windows 构建问题..."
-          $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
-          if (Test-Path $ttsCmakeFile) {
-            Write-Host "找到 flutter_tts CMakeLists.txt 文件"
-            Write-Host "文件内容:"
-            Get-Content $ttsCmakeFile
-            
-            $content = Get-Content $ttsCmakeFile -Raw
-            # 修复 install 命令语法
-            $content = $content -replace "install\s+TARGETS", "install(TARGETS"
-            $content = $content -replace "install\s+FILES", "install(FILES"
-            $content = $content -replace "install\s+DIRECTORY", "install(DIRECTORY"
-            $content | Set-Content $ttsCmakeFile -Encoding UTF8
-            Write-Host "已修复 flutter_tts CMakeLists.txt"
-            
-            Write-Host "修复后的文件内容:"
-            Get-Content $ttsCmakeFile
-          } else {
-            Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
-            Write-Host "当前目录结构:"
-            Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
+          # 修复 Windows 插件编译问题
+          Write-Host "修复 Windows 插件编译问题..."
+          
+          # 修复 window_manager 插件
+          $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
+          if (Test-Path $windowManagerCpp) {
+            Write-Host "修复 window_manager.cpp..."
+            $content = Get-Content $windowManagerCpp -Raw
+            # 修复命名空间问题
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content | Set-Content $windowManagerCpp -Encoding UTF8
           }
+          
+          # 修复 screen_retriever_windows 插件
+          $screenRetrieverH = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.h"
+          if (Test-Path $screenRetrieverH) {
+            Write-Host "修复 screen_retriever_windows_plugin.h..."
+            $content = Get-Content $screenRetrieverH -Raw
+            # 修复命名空间问题
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content | Set-Content $screenRetrieverH -Encoding UTF8
+          }
+          
+          # 修复 flutter_secure_storage_windows 插件
+          $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
+          if (Test-Path $secureStorageCpp) {
+            Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
+            $content = Get-Content $secureStorageCpp -Raw
+            # 修复命名空间和类型转换问题
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
+            $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
+            $content | Set-Content $secureStorageCpp -Encoding UTF8
+          }
+          
+          Write-Host "Windows 插件修复完成"
 
       - name: Build Windows
         shell: pwsh
