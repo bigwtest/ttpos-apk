@@ -238,35 +238,25 @@ jobs:
             
             Write-Host "开始修复 CMakeLists.txt..."
             
-            # 读取文件内容
-            $content = Get-Content $ttsCmakeFile -Raw
-            
             # 创建新的 CMakeLists.txt 内容
-            $newContent = @"
-            cmake_minimum_required(VERSION 3.10)
-            project(flutter_tts_plugin)
-
-            # 设置 C++ 标准
-            set(CMAKE_CXX_STANDARD 17)
-            set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-            # 查找 Flutter 包
-            find_package(Flutter REQUIRED)
-
-            # 添加 Flutter 库
-            add_library(flutter_tts_plugin SHARED
-                "flutter_tts_plugin.cpp"
-            )
-
-            # 链接 Flutter 库
-            target_link_libraries(flutter_tts_plugin PRIVATE flutter flutter_wrapper_plugin)
-
-            # 安装目标
-            install(TARGETS flutter_tts_plugin DESTINATION .)
-            "@
+            $cmakeContent = "cmake_minimum_required(VERSION 3.10)`n"
+            $cmakeContent += "project(flutter_tts_plugin)`n`n"
+            $cmakeContent += "# 设置 C++ 标准`n"
+            $cmakeContent += "set(CMAKE_CXX_STANDARD 17)`n"
+            $cmakeContent += "set(CMAKE_CXX_STANDARD_REQUIRED ON)`n`n"
+            $cmakeContent += "# 查找 Flutter 包`n"
+            $cmakeContent += "find_package(Flutter REQUIRED)`n`n"
+            $cmakeContent += "# 添加 Flutter 库`n"
+            $cmakeContent += "add_library(flutter_tts_plugin SHARED`n"
+            $cmakeContent += "    `"flutter_tts_plugin.cpp`"`n"
+            $cmakeContent += ")`n`n"
+            $cmakeContent += "# 链接 Flutter 库`n"
+            $cmakeContent += "target_link_libraries(flutter_tts_plugin PRIVATE flutter flutter_wrapper_plugin)`n`n"
+            $cmakeContent += "# 安装目标`n"
+            $cmakeContent += "install(TARGETS flutter_tts_plugin DESTINATION .)"
             
             # 写入新的内容
-            $newContent | Set-Content $ttsCmakeFile -Encoding UTF8
+            $cmakeContent | Set-Content $ttsCmakeFile -Encoding UTF8
             
             Write-Host "修复后的文件内容:"
             Get-Content $ttsCmakeFile
