@@ -201,11 +201,9 @@ jobs:
       - name: Prepare Windows Build
         shell: pwsh
         run: |
-          # 记录项目根目录
           $rootDir = $PWD
           Write-Host "项目根目录: $rootDir"
           
-          # 进入应用目录
           $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
           if (-not (Test-Path $appDir)) {
             Write-Error "应用目录不存在: $appDir"
@@ -214,22 +212,17 @@ jobs:
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
           
-          # 清理项目
           Write-Host "清理项目..."
           flutter clean
           
-          # 获取依赖
           Write-Host "获取依赖..."
           flutter pub get
           
-          # 重新生成 Windows 项目
           Write-Host "重新生成 Windows 项目..."
           flutter create . --platforms=windows
           
-          # 修复 Windows 插件编译问题
           Write-Host "修复 Windows 插件编译问题..."
           
-          # 修复 flutter_tts 插件的 CMakeLists.txt
           $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
           if (Test-Path $ttsCmakeFile) {
             Write-Host "找到 flutter_tts CMakeLists.txt 文件"
@@ -240,118 +233,21 @@ jobs:
             
             Write-Host "开始修复 CMakeLists.txt..."
             
-            # 创建新的 CMakeLists.txt 内容
-            $cmakeContent = "cmake_minimum_required(VERSION 3.10)`n"
-            $cmakeContent += "project(flutter_tts_plugin)`n`n"
-            $cmakeContent += "# 设置 C++ 标准`n"
-            $cmakeContent += "set(CMAKE_CXX_STANDARD 17)`n"
-            $cmakeContent += "set(CMAKE_CXX_STANDARD_REQUIRED ON)`n`n"
-            $cmakeContent += "# 设置 Flutter 路径`n"
-            $cmakeContent += "set(FLUTTER_EPHEMERAL_DIR `"${CMAKE_CURRENT_SOURCE_DIR}/../../..`")`n"
-            $cmakeContent += "set(FLUTTER_MANAGED_DIR `"${CMAKE_CURRENT_SOURCE_DIR}/../../..`")`n`n"
-            $cmakeContent += "# 包含 Flutter 配置`n"
-            $cmakeContent += "include(`"${FLUTTER_EPHEMERAL_DIR}/generated_plugins.cmake`")`n"
-            $cmakeContent += "include(`"${FLUTTER_EPHEMERAL_DIR}/CMakeLists.txt`")`n`n"
-            $cmakeContent += "# 设置 NuGet 路径`n"
-            $cmakeContent += "find_program(NUGET_EXE nuget)`n"
-            $cmakeContent += "if(NOT NUGET_EXE)`n"
-            $cmakeContent += "    message(FATAL_ERROR `"NuGet not found`")`n"
-            $cmakeContent += "endif()`n`n"
-            $cmakeContent += "# 安装 C++/WinRT 包`n"
-            $cmakeContent += "execute_process(`n"
-            $cmakeContent += "    COMMAND `"${NUGET_EXE}`" install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n"
-            $cmakeContent += "    WORKING_DIRECTORY `"${CMAKE_CURRENT_SOURCE_DIR}`"`n"
-            $cmakeContent += "    RESULT_VARIABLE NUGET_RESULT`n"
-            $cmakeContent += "    OUTPUT_STRIP_TRAILING_WHITESPACE`n"
-            $cmakeContent += "    ERROR_QUIET`n"
-            $cmakeContent += ")`n`n"
-            $cmakeContent += "if(NOT NUGET_RESULT EQUAL 0)`n"
-            $cmakeContent += "    message(FATAL_ERROR `"Failed to install C++/WinRT package`")`n"
-            $cmakeContent += "endif()`n`n"
-            $cmakeContent += "# 添加 Flutter 库`n"
-            $cmakeContent += "add_library(flutter_tts_plugin SHARED`n"
-            $cmakeContent += "    `"flutter_tts_plugin.cpp`"`n"
-            $cmakeContent += ")`n`n"
-            $cmakeContent += "# 链接 Flutter 库`n"
-            $cmakeContent += "target_link_libraries(flutter_tts_plugin PRIVATE flutter flutter_wrapper_plugin)`n`n"
-            $cmakeContent += "# 安装目标`n"
-            $cmakeContent += "install(TARGETS flutter_tts_plugin DESTINATION .)"
+            $content = Get-Content $ttsCmakeFile -Raw
+            $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
+            $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
             
-            # 写入新的内容
-            $cmakeContent | Set-Content $ttsCmakeFile -Encoding UTF8
+            $content = $content.Replace($oldCommand, $newCommand)
+            $content | Set-Content $ttsCmakeFile -Encoding UTF8
             
             Write-Host "修复后的文件内容:"
             Write-Host "----------------------------------------"
             Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
             Write-Host "----------------------------------------"
-            
-            # 检查文件是否存在
-            Write-Host "检查 Flutter 配置文件..."
-            $flutterDir = Join-Path $PWD "windows\flutter"
-            Write-Host "Flutter 目录: $flutterDir"
-            if (Test-Path $flutterDir) {
-                Write-Host "Flutter 目录内容:"
-                Get-ChildItem $flutterDir
-                
-                # 检查 generated_plugins.cmake 文件
-                $pluginsFile = Join-Path $flutterDir "generated_plugins.cmake"
-                if (Test-Path $pluginsFile) {
-                    Write-Host "generated_plugins.cmake 内容:"
-                    Write-Host "----------------------------------------"
-                    Get-Content $pluginsFile | ForEach-Object { Write-Host $_ }
-                    Write-Host "----------------------------------------"
-                } else {
-                    Write-Error "generated_plugins.cmake 文件不存在"
-                }
-                
-                # 检查 CMakeLists.txt 文件
-                $cmakeFile = Join-Path $flutterDir "CMakeLists.txt"
-                if (Test-Path $cmakeFile) {
-                    Write-Host "CMakeLists.txt 内容:"
-                    Write-Host "----------------------------------------"
-                    Get-Content $cmakeFile | ForEach-Object { Write-Host $_ }
-                    Write-Host "----------------------------------------"
-                } else {
-                    Write-Error "CMakeLists.txt 文件不存在"
-                }
-            } else {
-                Write-Error "Flutter 目录不存在"
-            }
           } else {
             Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
             Write-Host "当前目录结构:"
             Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
-          }
-          
-          # 修复 window_manager 插件
-          $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
-          if (Test-Path $windowManagerCpp) {
-            Write-Host "修复 window_manager.cpp..."
-            $content = Get-Content $windowManagerCpp -Raw
-            # 修复命名空间问题
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content | Set-Content $windowManagerCpp -Encoding UTF8
-          }
-          
-          # 修复 screen_retriever_windows 插件
-          $screenRetrieverH = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.h"
-          if (Test-Path $screenRetrieverH) {
-            Write-Host "修复 screen_retriever_windows_plugin.h..."
-            $content = Get-Content $screenRetrieverH -Raw
-            # 修复命名空间问题
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content | Set-Content $screenRetrieverH -Encoding UTF8
-          }
-          
-          # 修复 flutter_secure_storage_windows 插件
-          $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
-          if (Test-Path $secureStorageCpp) {
-            Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
-            $content = Get-Content $secureStorageCpp -Raw
-            # 修复命名空间和类型转换问题
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-            $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
-            $content | Set-Content $secureStorageCpp -Encoding UTF8
           }
           
           Write-Host "Windows 插件修复完成"
