@@ -30,7 +30,7 @@ on:
         #default: 'release'
         type: choice
         options:
-          - 'release'
+          - 'main'
           - 'new-test'
       base_url: 
         description: 'base_url (e.g., base_url)'
