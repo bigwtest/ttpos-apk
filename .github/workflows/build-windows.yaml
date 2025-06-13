@@ -264,6 +264,10 @@ jobs:
       - name: Build Windows
         shell: pwsh
         run: |
+          # 设置项目根目录
+          $rootDir = $PWD
+          Write-Host "项目根目录: $rootDir"
+          
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
