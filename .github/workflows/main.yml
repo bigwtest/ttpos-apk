@@ -130,6 +130,16 @@ jobs:
             $content | Set-Content $ttsCmakeFile -Encoding UTF8
           }
           
+          # 设置 C++ 版本
+          $cmakeFile = "windows\CMakeLists.txt"
+          if (Test-Path $cmakeFile) {
+            Write-Host "设置 C++ 版本..."
+            $content = Get-Content $cmakeFile -Raw
+            # 在 project 命令后添加 C++ 版本设置
+            $content = $content -replace "(project\(.*?\))", "`$1`nset(CMAKE_CXX_STANDARD 17)`nset(CMAKE_CXX_STANDARD_REQUIRED ON)"
+            $content | Set-Content $cmakeFile -Encoding UTF8
+          }
+          
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           Write-Host "开始执行构建脚本: $scriptPath"
