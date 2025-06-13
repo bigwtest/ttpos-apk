@@ -230,6 +230,10 @@ jobs:
           Write-Host "修复 flutter_tts Windows 构建问题..."
           $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
           if (Test-Path $ttsCmakeFile) {
+            Write-Host "找到 flutter_tts CMakeLists.txt 文件"
+            Write-Host "文件内容:"
+            Get-Content $ttsCmakeFile
+            
             $content = Get-Content $ttsCmakeFile -Raw
             # 修复 install 命令语法
             $content = $content -replace "install\s+TARGETS", "install(TARGETS"
@@ -237,6 +241,13 @@ jobs:
             $content = $content -replace "install\s+DIRECTORY", "install(DIRECTORY"
             $content | Set-Content $ttsCmakeFile -Encoding UTF8
             Write-Host "已修复 flutter_tts CMakeLists.txt"
+            
+            Write-Host "修复后的文件内容:"
+            Get-Content $ttsCmakeFile
+          } else {
+            Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
+            Write-Host "当前目录结构:"
+            Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
           }
 
       - name: Build Windows
