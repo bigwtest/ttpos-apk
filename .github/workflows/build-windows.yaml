@@ -234,7 +234,9 @@ jobs:
           if (Test-Path $ttsCmakeFile) {
             Write-Host "找到 flutter_tts CMakeLists.txt 文件"
             Write-Host "原始文件内容:"
-            Get-Content $ttsCmakeFile
+            Write-Host "----------------------------------------"
+            Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
+            Write-Host "----------------------------------------"
             
             Write-Host "开始修复 CMakeLists.txt..."
             
@@ -257,8 +259,8 @@ jobs:
             $cmakeContent += "endif()`n`n"
             $cmakeContent += "# 安装 C++/WinRT 包`n"
             $cmakeContent += "execute_process(`n"
-            $cmakeContent += "    COMMAND ${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n"
-            $cmakeContent += "    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}`n"
+            $cmakeContent += "    COMMAND `"${NUGET_EXE}`" install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n"
+            $cmakeContent += "    WORKING_DIRECTORY `"${CMAKE_CURRENT_SOURCE_DIR}`"`n"
             $cmakeContent += "    RESULT_VARIABLE NUGET_RESULT`n"
             $cmakeContent += "    OUTPUT_STRIP_TRAILING_WHITESPACE`n"
             $cmakeContent += "    ERROR_QUIET`n"
@@ -279,7 +281,42 @@ jobs:
             $cmakeContent | Set-Content $ttsCmakeFile -Encoding UTF8
             
             Write-Host "修复后的文件内容:"
-            Get-Content $ttsCmakeFile
+            Write-Host "----------------------------------------"
+            Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
+            Write-Host "----------------------------------------"
+            
+            # 检查文件是否存在
+            Write-Host "检查 Flutter 配置文件..."
+            $flutterDir = Join-Path $PWD "windows\flutter"
+            Write-Host "Flutter 目录: $flutterDir"
+            if (Test-Path $flutterDir) {
+                Write-Host "Flutter 目录内容:"
+                Get-ChildItem $flutterDir
+                
+                # 检查 generated_plugins.cmake 文件
+                $pluginsFile = Join-Path $flutterDir "generated_plugins.cmake"
+                if (Test-Path $pluginsFile) {
+                    Write-Host "generated_plugins.cmake 内容:"
+                    Write-Host "----------------------------------------"
+                    Get-Content $pluginsFile | ForEach-Object { Write-Host $_ }
+                    Write-Host "----------------------------------------"
+                } else {
+                    Write-Error "generated_plugins.cmake 文件不存在"
+                }
+                
+                # 检查 CMakeLists.txt 文件
+                $cmakeFile = Join-Path $flutterDir "CMakeLists.txt"
+                if (Test-Path $cmakeFile) {
+                    Write-Host "CMakeLists.txt 内容:"
+                    Write-Host "----------------------------------------"
+                    Get-Content $cmakeFile | ForEach-Object { Write-Host $_ }
+                    Write-Host "----------------------------------------"
+                } else {
+                    Write-Error "CMakeLists.txt 文件不存在"
+                }
+            } else {
+                Write-Error "Flutter 目录不存在"
+            }
           } else {
             Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
             Write-Host "当前目录结构:"
