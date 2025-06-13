@@ -272,8 +272,10 @@ jobs:
             $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
             $content | Set-Content $windowManagerCpp -Encoding UTF8
           }
           
@@ -290,6 +292,13 @@ jobs:
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
             $content | Set-Content $screenRetrieverH -Encoding UTF8
           }
           
@@ -306,6 +315,13 @@ jobs:
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
             $content | Set-Content $screenRetrieverCpp -Encoding UTF8
           }
           
@@ -323,6 +339,13 @@ jobs:
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
             $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
+            $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
             $content | Set-Content $secureStorageCpp -Encoding UTF8
           }
           
