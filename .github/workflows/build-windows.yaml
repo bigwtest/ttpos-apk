@@ -114,7 +114,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.3'
+          flutter-version: '3.16.9'  # 降级到稳定版本
           channel: 'stable'
           cache: true
 
@@ -198,11 +198,13 @@ jobs:
           }
           
           Write-Host "环境变量更新成功"
-      - name: Build Windows
+      - name: Prepare Windows Build
+        shell: pwsh
         run: |
           # 记录项目根目录
           $rootDir = $PWD
           Write-Host "项目根目录: $rootDir"
+          
           # 进入应用目录
           $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
           if (-not (Test-Path $appDir)) {
@@ -211,14 +213,57 @@ jobs:
           }
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
-          # # 配置 CMake
-          # Write-Host "配置 CMake..."
-          # $cmakeConfig = @"
-          # set(CMAKE_CXX_STANDARD 20)
-          # set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          # set(CMAKE_CXX_EXTENSIONS OFF)
-          # "@
-          # $cmakeConfig | Out-File -FilePath "windows\CMakeLists.txt" -Append -Encoding UTF8
+          
+          # 清理项目
+          Write-Host "清理项目..."
+          flutter clean
+          
+          # 获取依赖
+          Write-Host "获取依赖..."
+          flutter pub get
+          
+          # 重新生成 Windows 项目
+          Write-Host "重新生成 Windows 项目..."
+          flutter create . --platforms=windows
+          
+          # 修复插件问题
+          Write-Host "修复插件问题..."
+          $pluginDir = "windows\flutter\ephemeral\.plugin_symlinks"
+          if (Test-Path $pluginDir) {
+            Get-ChildItem -Path $pluginDir -Directory | ForEach-Object {
+              $pluginPath = $_.FullName
+              Write-Host "处理插件: $pluginPath"
+              
+              # 修复 window_manager 插件
+              if ($_.Name -eq "window_manager") {
+                $cppFile = Join-Path $pluginPath "windows\window_manager.cpp"
+                if (Test-Path $cppFile) {
+                  $content = Get-Content $cppFile -Raw
+                  $content = $content -replace "::GetValueKey", "GetValueKey"
+                  $content = $content -replace "::ForceRefresh", "ForceRefresh"
+                  $content = $content -replace "::ForceChildRefresh", "ForceChildRefresh"
+                  # ... 其他替换
+                  $content | Set-Content $cppFile -Encoding UTF8
+                }
+              }
+              
+              # 修复 screen_retriever 插件
+              if ($_.Name -eq "screen_retriever_windows") {
+                $hFile = Join-Path $pluginPath "windows\screen_retriever_windows_plugin.h"
+                if (Test-Path $hFile) {
+                  $content = Get-Content $hFile -Raw
+                  $content = $content -replace "::GetCursorScreenPoint", "GetCursorScreenPoint"
+                  $content = $content -replace "::GetPrimaryDisplay", "GetPrimaryDisplay"
+                  $content = $content -replace "::GetAllDisplays", "GetAllDisplays"
+                  $content | Set-Content $hFile -Encoding UTF8
+                }
+              }
+            }
+          }
+
+      - name: Build Windows
+        shell: pwsh
+        run: |
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           if (-not (Test-Path $scriptPath)) {
@@ -226,14 +271,17 @@ jobs:
             exit 1
           }
           Write-Host "开始执行构建脚本: $scriptPath"
+          
           # 设置错误处理
           $ErrorActionPreference = 'Continue'
           try {
             # 设置环境变量
             $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
             Write-Host "包名: $env:MELOS_PACKAGE_NAME"
+            
             # 直接执行构建脚本
             & $scriptPath
+            
             # 检查构建结果
             $releaseDir = Join-Path $rootDir "releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION"
             if (Test-Path $releaseDir) {
