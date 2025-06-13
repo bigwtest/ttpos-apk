@@ -1,176 +1,132 @@
-name: Build TTPOS ALL APK Windows
- 
-#构建所有apk，上传APK到google存储桶和中转服务器。然后从中转服务器SCP各端APK包到官网的downloads目录
-env:  
-  assistant_pack: assistant
-  kds_pack: kds
-  tablet_pack: tablet
-  pos_pack: pos
-  apk_output_path: releases
-  assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Assistant/' || 'dc_apk/TTPOS/Test/Assistant/' }}
-  kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kitchen/' || 'dc_apk/TTPOS/Test/Kitchen/' }}
-  tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Menu/' || 'dc_apk/TTPOS/Test/Menu/' }}
-  pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Cashier/' || 'dc_apk/TTPOS/Test/Cashier/' }}
-  #中转服务器路径
-  scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
-  scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
-  scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
-  scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
-  #最终下载路径：www.ttpos.com/downloads
-  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Assistant/' }}
-  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kitchen/' }}
-  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Menu/' }}
-  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Cashier/' }}
+name: Build Windows Simple
+
 on:
   workflow_dispatch:
     inputs:
-      branch: 
-        description: 'branch (e.g., release)'
+      branch:
+        description: "选择构建分支"
         required: true
-        #default: 'release'
         type: choice
         options:
-          - 'main'
-          - 'new-test'
-      base_url: 
-        description: 'base_url (e.g., base_url)'
+          - "main"
+          - "new-test"
+      package_name:
+        description: "选择要构建的包"
         required: true
-        #default: 'https://api.ttpos.com/api/v1'
         type: choice
         options:
-          - 'https://api.ttpos.com/api/v1'
-          - 'https://ttpos-test1.ttpos.com/api/v1'
-          - 'https://ttpos-pro.keli.vip/api/v1'
-      base_ws_url: 
-        description: 'base_ws_url (e.g., base_ws_url)'
+          - pos
+          - kds
+          - assistant
+          - tablet
+      base_url:
+        description: "选择API基础URL"
         required: true
-        #default: 'wss://api.ttpos.com/ws'
         type: choice
         options:
-          - 'wss://api.ttpos.com/ws'
-          - 'wss://ttpos-test1.ttpos.com/ws'
-          - 'wss://ttpos-pro.keli.vip/ws'
-      scp: 
-        description: 'scp (on/off)'
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "选择WebSocket基础URL"
         required: true
-        default: 'off'
+        type: choice
+        options:
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
+
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        apk_path_name: [ assistant,kds,tablet,pos ]
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
-      #环境
-      - name: Set up Flutter
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-            channel: stable
-            cache: true
-            flutter-version: '3.27.3'
-    
+          flutter-version: '3.27.3'
+          channel: 'stable'
+
       - name: Install Melos
         run: |
-            flutter --version
-            dart pub global activate melos
-    
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-            distribution: 'temurin'
-            java-version: '17'
-            cache: 'gradle'
+          flutter --version
+          dart pub global activate melos
 
       - name: Melos init config
-        env: 
+        env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
           FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
         run: |
-            melos run init
-            melos bs
-       
-      - name: Config API_BASE_URL
-        if: matrix.apk_path_name == 'assistant'
-        id: assistant_config
-        run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/assistant/.env.production.local 
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/assistant/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_ASSISTANT }}|' apps/assistant/.env.production.local
-            cat ./apps/assistant/.env.production.local
-            
-      - name: Config API_BASE_URL
-        if: matrix.apk_path_name == 'kds'
-        id: kds_config
-        run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/kds/.env.production.local 
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/kds/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_KDS }}|' apps/kds/.env.production.local 
-            cat ./apps/assistant/.env.production.local
-            
-      - name: Config API_BASE_URL
-        if: matrix.apk_path_name == 'tablet'
-        id: tablet_config
-        run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/tablet/.env.production.local
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/tablet/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_TABLET }}|' apps/tablet/.env.production.local
-            cat ./apps/assistant/.env.production.local
-            
-      - name: Config API_BASE_URL
-        if: matrix.apk_path_name == 'pos'
-        id: pos_config
-        run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/pos/.env.production.local 
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/pos/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_POS }}|' apps/pos/.env.production.local
-            cat ./apps/pos/.env.production.local
-      
-      - name: Build ASSISTANT APK
-        if: matrix.apk_path_name == 'assistant'  
-        run: |
-            bash -x ./scripts/build_win.ps1 assistant
+          melos run init
+          melos bs
 
-      - name: Build KDS APK
-        if: matrix.apk_path_name == 'kds'  
+      - name: Config API_BASE_URL
+        shell: pwsh
         run: |
-            bash -x ./scripts/build_win.ps1 kds
-     
-      - name: Build Tablet APK
-        if: matrix.apk_path_name == 'tablet'  
+          Write-Host "配置环境变量..."
+          Write-Host "base_url: ${{ github.event.inputs.base_url }}"
+          Write-Host "base_ws_url: ${{ github.event.inputs.base_ws_url }}"
+          
+          # 设置环境变量
+          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
+          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
+          
+          # 更新 .env 文件
+          $envFile = "apps/${{ github.event.inputs.package_name }}/.env.production.local"
+          Write-Host "更新环境文件: $envFile"
+          
+          # 读取文件内容
+          $lines = Get-Content $envFile
+          $newLines = @()
+          
+          # 处理每一行
+          foreach ($line in $lines) {
+            if ($line -match '^API_BASE_URL=') {
+              $newLines += "API_BASE_URL=$env:API_BASE_URL"
+            }
+            elseif ($line -match '^WS_BASE_URL=') {
+              $newLines += "WS_BASE_URL=$env:WS_BASE_URL"
+            }
+            else {
+              $newLines += $line
+            }
+          }
+          
+          # 写入新内容
+          $newLines | Set-Content $envFile -Encoding UTF8
+          
+          Write-Host "环境文件内容:"
+          Get-Content $envFile
+
+      - name: Build Windows
+        shell: pwsh
         run: |
-            bash -x ./scripts/build_win.ps1 tablet
-
-      - name: Build POS APK
-        if: matrix.apk_path_name == 'pos'
-        run: |
-            bash -x ./scripts/build_win.ps1 pos
-   
-      - uses: 'google-github-actions/auth@v2'
-        with:
-          credentials_json: '${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}'  
-
-      # - id: 'upload-files'
-      #   uses: 'google-github-actions/upload-cloud-storage@v2'
-      #   with:
-      #     path: ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}
-      #     destination: ${{ env[format('{0}_path', matrix.apk_path_name)] }} 
-      #     parent: false
-
-      # - name: SCP-UPLOAD
-      #   if: github.event.inputs.scp == 'on'
-      #   uses: Comori/ssh@v0.0.7
-      #   with:
-      #     host: ${{ secrets.SCP_S_HOST }}
-      #     username: ${{ secrets.SCP_S_USER }}
-      #     privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
-      #     command: |
-      #       scp ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}*.apk ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
-      #     sourceFiles: |
-      #       ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/*.apk
-      #     targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
-      #     scpFirst: true             
-            
+          # 设置项目根目录
+          $rootDir = $PWD
+          Write-Host "项目根目录: $rootDir"
+          
+          # 进入应用目录
+          $appDir = Join-Path $rootDir "apps\${{ github.event.inputs.package_name }}"
+          Set-Location $appDir
+          Write-Host "当前应用目录: $PWD"
+          
+          # 执行构建脚本
+          $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
+          Write-Host "开始执行构建脚本: $scriptPath"
+          
+          # 设置环境变量
+          $env:MELOS_PACKAGE_NAME = "${{ github.event.inputs.package_name }}"
+          Write-Host "包名: $env:MELOS_PACKAGE_NAME"
+          
+          # 执行构建脚本
+          & $scriptPath
+          
+          # 检查构建结果
+          $releaseDir = Join-Path $rootDir "releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION"
+          Write-Host "构建完成，发布目录内容:"
+          Get-ChildItem -Path $releaseDir 
