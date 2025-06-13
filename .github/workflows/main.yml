@@ -115,6 +115,21 @@ jobs:
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
           
+          # 重新生成 Windows 项目
+          Write-Host "重新生成 Windows 项目..."
+          flutter create . --platforms=windows
+          
+          # 修复 flutter_tts 插件的 CMakeLists.txt
+          $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
+          if (Test-Path $ttsCmakeFile) {
+            Write-Host "修复 flutter_tts CMakeLists.txt 文件"
+            $content = Get-Content $ttsCmakeFile -Raw
+            $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
+            $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
+            $content = $content.Replace($oldCommand, $newCommand)
+            $content | Set-Content $ttsCmakeFile -Encoding UTF8
+          }
+          
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
           Write-Host "开始执行构建脚本: $scriptPath"
