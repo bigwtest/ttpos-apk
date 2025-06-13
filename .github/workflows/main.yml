@@ -45,7 +45,17 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-2022,
+              arch: x86_64,
+              vcpkg-triplet: x64-windows-static,
+            }
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
@@ -59,13 +69,6 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
-
-      - name: Patch flutter
-        shell: bash
-        run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
-          cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
       - name: Install Melos
         run: |
@@ -129,7 +132,6 @@ jobs:
           $appDir = Join-Path $rootDir "apps\${{ github.event.inputs.package_name }}"
           Set-Location $appDir
           Write-Host "当前应用目录: $PWD"
-          
           
           # 执行构建脚本
           $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
