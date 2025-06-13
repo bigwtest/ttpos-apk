@@ -116,13 +116,13 @@ jobs:
         with:
           flutter-version: '3.24.3'  # 更新到项目要求的最低版本
           channel: 'stable'
-          cache: true
+          #cache: true
 
       - name: Install Melos
         run: |
-          flutter --version
-          dart --version
-          dart pub global activate melos@6.1.0  # 使用 dart pub 安装指定版本的 Melos
+            flutter --version
+            dart pub global activate melos
+            
       - name: Melos init config
         env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
