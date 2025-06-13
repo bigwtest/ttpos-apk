@@ -225,41 +225,6 @@ jobs:
           # 重新生成 Windows 项目
           Write-Host "重新生成 Windows 项目..."
           flutter create . --platforms=windows
-          
-          # 修复插件问题
-          Write-Host "修复插件问题..."
-          $pluginDir = "windows\flutter\ephemeral\.plugin_symlinks"
-          if (Test-Path $pluginDir) {
-            Get-ChildItem -Path $pluginDir -Directory | ForEach-Object {
-              $pluginPath = $_.FullName
-              Write-Host "处理插件: $pluginPath"
-              
-              # 修复 window_manager 插件
-              if ($_.Name -eq "window_manager") {
-                $cppFile = Join-Path $pluginPath "windows\window_manager.cpp"
-                if (Test-Path $cppFile) {
-                  $content = Get-Content $cppFile -Raw
-                  $content = $content -replace "::GetValueKey", "GetValueKey"
-                  $content = $content -replace "::ForceRefresh", "ForceRefresh"
-                  $content = $content -replace "::ForceChildRefresh", "ForceChildRefresh"
-                  # ... 其他替换
-                  $content | Set-Content $cppFile -Encoding UTF8
-                }
-              }
-              
-              # 修复 screen_retriever 插件
-              if ($_.Name -eq "screen_retriever_windows") {
-                $hFile = Join-Path $pluginPath "windows\screen_retriever_windows_plugin.h"
-                if (Test-Path $hFile) {
-                  $content = Get-Content $hFile -Raw
-                  $content = $content -replace "::GetCursorScreenPoint", "GetCursorScreenPoint"
-                  $content = $content -replace "::GetPrimaryDisplay", "GetPrimaryDisplay"
-                  $content = $content -replace "::GetAllDisplays", "GetAllDisplays"
-                  $content | Set-Content $hFile -Encoding UTF8
-                }
-              }
-            }
-          }
 
       - name: Build Windows
         shell: pwsh
