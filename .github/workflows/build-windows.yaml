@@ -111,10 +111,16 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.1'
+          cache: 'npm'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.9'  # 降级到稳定版本
+          flutter-version: '3.24.3'  # 更新到项目要求的最低版本
           channel: 'stable'
           cache: true
 
@@ -122,7 +128,7 @@ jobs:
         run: |
           flutter --version
           dart --version
-          dart pub global activate melos
+          npm install -g melos@6.1.0  # 安装指定版本的 Melos
       - name: Melos init config
         env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
