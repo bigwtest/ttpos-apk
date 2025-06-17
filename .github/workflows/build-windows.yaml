@@ -1,534 +1,115 @@
-name: Build Windows
-
-env:
-  assistant_pack: assistant
-  kds_pack: kds
-  tablet_pack: tablet
-  pos_pack: pos
-  output_path: releases
-  # 中转服务器路径
-  scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/assistant/' || '/hitosea/ttpos-windows/Test/assistant/' }}
-  scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/kds/' || '/hitosea/ttpos-windows/Test/kds/' }}
-  scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/tablet/' || '/hitosea/ttpos-windows/Test/tablet/' }}
-  scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/pos/' || '/hitosea/ttpos-windows/Test/pos/' }}
-  # 最终下载路径
-  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Assistant/' }}
-  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Kitchen/' }}
-  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Menu/' }}
-  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Cashier/' }}
+name: Build Android APK
 
 on:
-  # push:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'apps/**'
-  #     - 'packages/**'
-  #     - '.github/workflows/build-windows.yaml'
-  # pull_request:
-  #   branches: [ main, develop ]
-  #   paths:
-  #     - 'apps/**'
-  #     - 'packages/**'
-  #     - '.github/workflows/build-windows.yaml'
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "选择构建分支"
-        required: true
-        type: choice
-        options:
-          - "main"
-          - "new-test"
-      build_type:
-        description: "选择构建类型"
-        required: true
-        type: choice
-        options:
-          - "all"
-          - "single"
-      package_name:
-        description: "选择要构建的包（仅在构建类型为 single 时生效）"
-        required: false
-        type: choice
-        options:
-          - pos
-          - kds
-          - assistant
-          - tablet
-      base_url:
-        description: "选择API基础URL"
-        required: true
-        type: choice
-        options:
-          - "https://ttpos-test1.ttpos.com/api/v1"
-          - "https://api.ttpos.com/api/v1"
-          - "https://ttpos-pro.keli.vip/api/v1"
-      base_ws_url:
-        description: "选择WebSocket基础URL"
-        required: true
-        type: choice
-        options:
-          - "wss://ttpos-test1.ttpos.com/ws"
-          - "wss://api.ttpos.com/ws"
-          - "wss://ttpos-pro.keli.vip/ws"
-      scp:
-        description: "是否启用SCP传输"
-        required: true
-        default: "off"
-        type: choice
-        options:
-          - "on"
-          - "off"
 
 jobs:
-  prepare:
-    runs-on: windows-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Set matrix
-        id: set-matrix
-        shell: pwsh
-        run: |
-          $packages = if ('${{ github.event.inputs.build_type }}' -eq 'single') {
-            @('${{ github.event.inputs.package_name }}')
-          } else {
-            @('pos', 'kds', 'assistant', 'tablet')
-          }
-          $matrix = @{
-            include = $packages | ForEach-Object { @{ package_name = $_ } }
-          } | ConvertTo-Json -Compress
-          "matrix=$matrix" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
   build:
-    needs: prepare
     runs-on: windows-latest
-    strategy:
-      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    
     steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
-          fetch-depth: 0
-
+      - uses: actions/checkout@v3
+      
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.3'  # 更新到项目要求的最低版本
+          flutter-version: '3.19.0'
           channel: 'stable'
-          #cache: true
-
-      - name: Install Melos
-        run: |
-            flutter --version
-            dart pub global activate melos
-            
-      - name: Melos init config
-        env:
-          PUB_HOSTED_URL: https://pub.flutter-io.cn
-          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
-        run: |
-          melos run init
-          melos bs
-      - name: Config API_BASE_URL
+          
+      - name: Install dependencies
         shell: pwsh
         run: |
-          Write-Host "配置环境变量..."
-          Write-Host "base_url: ${{ github.event.inputs.base_url }}"
-          Write-Host "base_ws_url: ${{ github.event.inputs.base_ws_url }}"
+          flutter pub get
+          flutter pub global activate melos
+          melos bootstrap
           
-          # 设置环境变量
-          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
-          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
           
-          # 确保环境变量不为空
-          if ([string]::IsNullOrEmpty($env:API_BASE_URL)) {
-            Write-Error "API_BASE_URL 不能为空"
-            exit 1
-          }
-          if ([string]::IsNullOrEmpty($env:WS_BASE_URL)) {
-            Write-Error "WS_BASE_URL 不能为空"
-            exit 1
-          }
+      - name: Build APKs
+        shell: pwsh
+        run: |
+          # 定义要构建的应用列表
+          $apps = @("pos", "assistant", "tablet", "kds")
           
-          # 更新 .env 文件
-          $envFile = "apps/${{ matrix.package_name }}/.env.production.local"
-          if (-not (Test-Path $envFile)) {
-            Write-Error "环境文件不存在: $envFile"
-            exit 1
-          }
-          
-          Write-Host "更新环境文件: $envFile"
-          
-          # 读取文件内容
-          $lines = Get-Content $envFile
-          $newLines = @()
-          
-          # 处理每一行
-          foreach ($line in $lines) {
-            if ($line -match '^API_BASE_URL=') {
-              $newLines += "API_BASE_URL=$env:API_BASE_URL"
+          foreach ($app in $apps) {
+            Write-Host "正在构建 $app 应用..."
+            
+            # 切换到应用目录
+            Set-Location "apps/$app"
+            
+            # 获取版本号
+            $version = (Get-Content pubspec.yaml | Select-String -Pattern "version:").ToString().Split(":")[1].Trim()
+            Write-Host "当前应用 $app 的版本号: $version"
+            
+            # 设置环境变量
+            $env:MELOS_PACKAGE_NAME = $app
+            $env:MELOS_PACKAGE_VERSION = $version
+            
+            # 构建 APK
+            flutter build apk --release
+            
+            # 创建发布目录
+            New-Item -Path "../../releases/$app/$version" -ItemType Directory -Force
+            
+            # 复制 APK 到发布目录
+            $app_name = switch ($app) {
+              "pos" { "TTPOS" }
+              "kds" { "TTPOS-Kitchen" }
+              "assistant" { "TTPOS-Go" }
+              "tablet" { "TTPOS-Menu" }
+              default { $app }
             }
-            elseif ($line -match '^WS_BASE_URL=') {
-              $newLines += "WS_BASE_URL=$env:WS_BASE_URL"
-            }
-            else {
-              $newLines += $line
-            }
+            
+            Copy-Item -Path "build/app/outputs/flutter-apk/app-release.apk" -Destination "../../releases/$app/$version/$app_name-$version.apk"
+            
+            # 返回项目根目录
+            Set-Location "../.."
           }
           
-          # 写入新内容
-          $newLines | Set-Content $envFile -Encoding UTF8
-          
-          Write-Host "环境文件内容:"
-          Get-Content $envFile
-          
-          # 验证更新
-          $updatedContent = Get-Content $envFile
-          $apiLine = $updatedContent | Where-Object { $_ -match '^API_BASE_URL=' }
-          $wsLine = $updatedContent | Where-Object { $_ -match '^WS_BASE_URL=' }
-          
-          if (-not ($apiLine -eq "API_BASE_URL=$env:API_BASE_URL")) {
-            Write-Error "API_BASE_URL 更新失败，当前值: $apiLine"
-            exit 1
-          }
-          if (-not ($wsLine -eq "WS_BASE_URL=$env:WS_BASE_URL")) {
-            Write-Error "WS_BASE_URL 更新失败，当前值: $wsLine"
-            exit 1
-          }
-          
-          Write-Host "环境变量更新成功"
-      # - name: Prepare Windows Build
+      # - name: Create Release ZIP
       #   shell: pwsh
       #   run: |
-      #     $rootDir = $PWD
-      #     Write-Host "项目根目录: $rootDir"
-          
-      #     $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
-      #     if (-not (Test-Path $appDir)) {
-      #       Write-Error "应用目录不存在: $appDir"
-      #       exit 1
+      #     # 创建临时目录
+      #     $tempDir = Join-Path $PWD "temp_for_zip"
+      #     if (Test-Path $tempDir) {
+      #       Remove-Item -Path $tempDir -Recurse -Force
       #     }
-      #     Set-Location $appDir
-      #     Write-Host "当前应用目录: $PWD"
+      #     New-Item -Path $tempDir -ItemType Directory -Force
           
-      #     Write-Host "清理项目..."
-      #     flutter clean
-          
-      #     Write-Host "获取依赖..."
-      #     flutter pub get
-          
-      #     Write-Host "重新生成 Windows 项目..."
-      #     flutter create . --platforms=windows
-          
-      #     Write-Host "修复 Windows 插件编译问题..."
-          
-      #     # 修复 flutter_tts 插件的 CMakeLists.txt
-      #     $ttsCmakeFile = "windows\flutter\ephemeral\.plugin_symlinks\flutter_tts\windows\CMakeLists.txt"
-      #     if (Test-Path $ttsCmakeFile) {
-      #       Write-Host "找到 flutter_tts CMakeLists.txt 文件"
-      #       Write-Host "原始文件内容:"
-      #       Write-Host "----------------------------------------"
-      #       Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
-      #       Write-Host "----------------------------------------"
+      #     # 复制所有 APK 到临时目录
+      #     foreach ($app in @("pos", "assistant", "tablet", "kds")) {
+      #       $version = (Get-Content "apps/$app/pubspec.yaml" | Select-String -Pattern "version:").ToString().Split(":")[1].Trim()
+      #       $app_name = switch ($app) {
+      #         "pos" { "TTPOS" }
+      #         "kds" { "TTPOS-Kitchen" }
+      #         "assistant" { "TTPOS-Go" }
+      #         "tablet" { "TTPOS-Menu" }
+      #         default { $app }
+      #       }
             
-      #       Write-Host "开始修复 CMakeLists.txt..."
-            
-      #       $content = Get-Content $ttsCmakeFile -Raw
-      #       $oldCommand = "execute_process(`n  COMMAND `${CMAKE_CURRENT_SOURCE_DIR}/nuget.exe install -OutputDirectory `${CMAKE_CURRENT_SOURCE_DIR}/packages Microsoft.Windows.CppWinRT -Version 2.0.210312.4`n)`n    ARGS install `"Microsoft.Windows.CppWinRT`" -Version 	2.0.210503.1 -ExcludeVersion -OutputDirectory `${CMAKE_BINARY_DIR}/packages)"
-      #       $newCommand = "execute_process(`n  COMMAND `${NUGET_EXE} install `"Microsoft.Windows.CppWinRT`" -Version 2.0.210503.1 -ExcludeVersion -OutputDirectory `"${CMAKE_BINARY_DIR}/packages`"`n  WORKING_DIRECTORY `${CMAKE_CURRENT_SOURCE_DIR}`n  RESULT_VARIABLE NUGET_RESULT`n  OUTPUT_STRIP_TRAILING_WHITESPACE`n  ERROR_QUIET`n)"
-            
-      #       $content = $content.Replace($oldCommand, $newCommand)
-      #       $content | Set-Content $ttsCmakeFile -Encoding UTF8
-            
-      #       Write-Host "修复后的文件内容:"
-      #       Write-Host "----------------------------------------"
-      #       Get-Content $ttsCmakeFile | ForEach-Object { Write-Host $_ }
-      #       Write-Host "----------------------------------------"
-      #     } else {
-      #       Write-Host "未找到 flutter_tts CMakeLists.txt 文件"
-      #       Write-Host "当前目录结构:"
-      #       Get-ChildItem -Path "windows\flutter\ephemeral\.plugin_symlinks" -Recurse
+      #       Copy-Item -Path "releases/$app/$version/$app_name-$version.apk" -Destination $tempDir
       #     }
           
-      #     # 修复 audioplayers_windows 插件的协程问题
-      #     $audioPlayersCpp = "windows\flutter\ephemeral\.plugin_symlinks\audioplayers_windows\windows\audioplayers_windows_plugin.cpp"
-      #     if (Test-Path $audioPlayersCpp) {
-      #       Write-Host "修复 audioplayers_windows_plugin.cpp..."
-      #       $content = Get-Content $audioPlayersCpp -Raw
-      #       $content = $content -replace "#include <experimental/coroutine>", "#include <coroutine>"
-      #       $content = $content -replace "std::experimental::coroutine_handle", "std::coroutine_handle"
-      #       $content = $content -replace "std::experimental::suspend_never", "std::suspend_never"
-      #       $content = $content -replace "std::experimental::suspend_always", "std::suspend_always"
-      #       $content = $content -replace "std::experimental::coroutine_traits", "std::coroutine_traits"
-      #       $content = $content -replace "std::experimental::noop_coroutine", "std::noop_coroutine"
-      #       $content = $content -replace "std::experimental::noop_coroutine_handle", "std::noop_coroutine_handle"
-      #       $content = $content -replace "std::experimental::noop_coroutine_promise", "std::noop_coroutine_promise"
-      #       $content = $content -replace "std::experimental::noop_coroutine_handle<void>", "std::noop_coroutine_handle<void>"
-      #       $content = $content -replace "std::experimental::noop_coroutine_handle<.*>", "std::noop_coroutine_handle<void>"
-      #       $content | Set-Content $audioPlayersCpp -Encoding UTF8
-      #     }
+      #     # 创建 ZIP 文件
+      #     Compress-Archive -Path "$tempDir\*" -DestinationPath "android-$version.zip" -Force
           
-      #     # 修复 window_manager 插件的成员函数声明
-      #     $windowManagerCpp = "windows\flutter\ephemeral\.plugin_symlinks\window_manager\windows\window_manager.cpp"
-      #     if (Test-Path $windowManagerCpp) {
-      #       Write-Host "修复 window_manager.cpp..."
-      #       $content = Get-Content $windowManagerCpp -Raw
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content | Set-Content $windowManagerCpp -Encoding UTF8
-      #     }
+      #     # 清理临时目录
+      #     Remove-Item -Path $tempDir -Recurse -Force
           
-      #     # 修复 screen_retriever_windows 插件的成员函数声明
-      #     $screenRetrieverH = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.h"
-      #     if (Test-Path $screenRetrieverH) {
-      #       Write-Host "修复 screen_retriever_windows_plugin.h..."
-      #       $content = Get-Content $screenRetrieverH -Raw
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content | Set-Content $screenRetrieverH -Encoding UTF8
-      #     }
-          
-      #     # 修复 screen_retriever_windows 插件的 cpp 文件
-      #     $screenRetrieverCpp = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin.cpp"
-      #     if (Test-Path $screenRetrieverCpp) {
-      #       Write-Host "修复 screen_retriever_windows_plugin.cpp..."
-      #       $content = Get-Content $screenRetrieverCpp -Raw
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content | Set-Content $screenRetrieverCpp -Encoding UTF8
-      #     }
-          
-      #     # 修复 flutter_secure_storage_windows 插件的预处理器命令问题
-      #     $secureStorageCpp = "windows\flutter\ephemeral\.plugin_symlinks\flutter_secure_storage_windows\windows\flutter_secure_storage_windows_plugin.cpp"
-      #     if (Test-Path $secureStorageCpp) {
-      #       Write-Host "修复 flutter_secure_storage_windows_plugin.cpp..."
-      #       $content = Get-Content $secureStorageCpp -Raw
-      #       $content = $content -replace "ATL::CW2A\s+(\w+)", "std::string $1"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content | Set-Content $secureStorageCpp -Encoding UTF8
-      #     }
-          
-      #     # 修复 screen_retriever_windows 插件的 c_api 文件
-      #     $screenRetrieverCApi = "windows\flutter\ephemeral\.plugin_symlinks\screen_retriever_windows\windows\screen_retriever_windows_plugin_c_api.cpp"
-      #     if (Test-Path $screenRetrieverCApi) {
-      #       Write-Host "修复 screen_retriever_windows_plugin_c_api.cpp..."
-      #       $content = Get-Content $screenRetrieverCApi -Raw
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)", "void $2()"
-      #       $content = $content -replace "void\s+(\w+)\s*\([^)]*\)\s*;", "void $1();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override", "void $2() override"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const", "void $2() const"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept", "void $2() noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept", "void $2() const noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept", "void $2() override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept", "void $2() const override noexcept"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*override\s*noexcept\s*;", "void $2() const override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*noexcept\s*;", "void $2() override noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*noexcept\s*;", "void $2() const noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*noexcept\s*;", "void $2() noexcept;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*const\s*;", "void $2() const;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*override\s*;", "void $2() override;"
-      #       $content = $content -replace "(\w+)\s+(\w+)\s*\([^)]*\)\s*;", "void $2();"
-      #       $content | Set-Content $screenRetrieverCApi -Encoding UTF8
-      #     }
-          
-      #     Write-Host "Windows 插件修复完成"
-
-      - name: Build Windows
-        shell: pwsh
-        run: |
-          # 设置项目根目录
-          $rootDir = $PWD
-          Write-Host "项目根目录: $rootDir"
-          
-          # 进入应用目录
-          $appDir = Join-Path $rootDir "apps\${{ matrix.package_name }}"
-          if (-not (Test-Path $appDir)) {
-            Write-Error "应用目录不存在: $appDir"
-            exit 1
-          }
-          Set-Location $appDir
-          Write-Host "当前应用目录: $PWD"
-          
-          # 执行构建脚本
-          $scriptPath = Join-Path $rootDir "scripts\build_win.ps1"
-          if (-not (Test-Path $scriptPath)) {
-            Write-Error "构建脚本不存在: $scriptPath"
-            exit 1
-          }
-          Write-Host "开始执行构建脚本: $scriptPath"
-          
-          # 设置错误处理
-          $ErrorActionPreference = 'Continue'
-          try {
-            # 设置环境变量
-            $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
-            Write-Host "包名: $env:MELOS_PACKAGE_NAME"
-            
-            # 直接执行构建脚本
-            & $scriptPath
-            
-            # 检查构建结果
-            $releaseDir = Join-Path $rootDir "releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION"
-            if (Test-Path $releaseDir) {
-              Write-Host "构建完成，发布目录内容:"
-              Get-ChildItem -Path $releaseDir
-            } else {
-              Write-Error "发布目录不存在: $releaseDir"
-              exit 1
-            }
-          }
-          catch {
-            Write-Error "构建过程中出错: $_"
-            Write-Host "错误详情:"
-            $_.Exception | Format-List -Force
-            Write-Host "调用堆栈:"
-            $_.ScriptStackTrace
-            exit 1
-          }
-          finally {
-            # 恢复错误处理设置
-            $ErrorActionPreference = 'Stop'
-          }
-      - name: SCP-UPLOAD
-        if: github.event.inputs.scp == 'on'
-        uses: Comori/ssh@v0.0.7
-        with:
-          host: ${{ secrets.SCP_S_HOST }}
-          username: ${{ secrets.SCP_S_USER }}
-          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
-          command: |
-            scp ${{ env[format('scp_s_{0}', matrix.package_name)] }}*.zip ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.package_name)] }}
-          sourceFiles: |
-            ${{ env.output_path }}/${{ matrix.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}/*.zip
-          targetDir: ${{ env[format('scp_s_{0}', matrix.package_name)] }}
-          scpFirst: true
-
-      - name: Create Release
-        if: github.event.inputs.branch == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            releases/${{ env.MELOS_PACKAGE_NAME }}/${{ env.MELOS_PACKAGE_VERSION }}/*.zip
-          tag_name: v${{ env.MELOS_PACKAGE_VERSION }}
-          name: Release ${{ env.MELOS_PACKAGE_NAME }} v${{ env.MELOS_PACKAGE_VERSION }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Upload Release Assets
+      #   uses: softprops/action-gh-release@v1
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   with:
+      #     files: |
+      #       android-*.zip
+      #       releases/**/*.apk
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
