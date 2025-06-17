@@ -36,9 +36,13 @@ jobs:
       - name: Build APKs
         shell: pwsh
         run: |
+          # 检查并显示 Java 环境
+          Write-Host "JAVA_HOME: $env:JAVA_HOME"
+          Write-Host "Java version:"
+          java -version
+          
           # 设置 Gradle 属性
           $env:GRADLE_OPTS = "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8"
-          $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.2.13-hotspot"
           
           # 定义要构建的应用列表
           $apps = @("pos", "assistant", "tablet", "kds")
@@ -57,7 +61,14 @@ jobs:
             $env:MELOS_PACKAGE_NAME = $app
             $env:MELOS_PACKAGE_VERSION = $version
             
+            # 清理旧的构建文件
+            if (Test-Path "build") {
+              Remove-Item -Path "build" -Recurse -Force
+            }
+            
             # 构建 APK
+            flutter clean
+            flutter pub get
             flutter build apk --release
             
             # 创建发布目录
@@ -72,7 +83,13 @@ jobs:
               default { $app }
             }
             
-            Copy-Item -Path "build/app/outputs/flutter-apk/app-release.apk" -Destination "../../releases/$app/$version/$app_name-$version.apk"
+            $apkPath = "build/app/outputs/flutter-apk/app-release.apk"
+            if (Test-Path $apkPath) {
+              Copy-Item -Path $apkPath -Destination "../../releases/$app/$version/$app_name-$version.apk"
+            } else {
+              Write-Error "APK 文件未找到: $apkPath"
+              exit 1
+            }
             
             # 返回项目根目录
             Set-Location "../.."
