@@ -31,11 +31,15 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           
       - name: Build APKs
         shell: pwsh
         run: |
+          # 设置 Gradle 属性
+          $env:GRADLE_OPTS = "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8"
+          $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.2.13-hotspot"
+          
           # 定义要构建的应用列表
           $apps = @("pos", "assistant", "tablet", "kds")
           
