@@ -1,0 +1,41 @@
+name: Build Web MEU 、 Mobile and Member
+
+env:
+  apk_output_path: releases
+  # Docker镜像配置
+  REGISTRY: hub.hitosea.com
+  IMAGE_NAME: ttpos-web
+  IMAGE_TAG: ${{ github.event.inputs.branch == 'main' && '' || 'test-' }}
+  BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "branch (e.g., release)"
+        required: true
+        #default: 'release'
+        type: choice
+        options:
+          - "new-test"
+          - "main"
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        program: [menu, mobile, member]
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: Echo Commit_id
+        id: build
+        run: |
+          echo "COMMIT_ID=$(git log -1 --pretty=format:%h -- .)" >> $GITHUB_OUTPUT
