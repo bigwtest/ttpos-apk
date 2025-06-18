@@ -5,7 +5,7 @@ env:
   # Docker镜像配置
   REGISTRY: hub.hitosea.com
   IMAGE_NAME: ttpos-web
-  IMAGE_TAG: ${{ github.event.inputs.branch == 'main' && '' || 'test-' }}
+  IMAGE_TAG: ${{ github.event.inputs.branch == 'main' && '1' || 'test-' }}
   BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
 
 on:
@@ -35,7 +35,3 @@ jobs:
         with:
           ref: ${{ env.BRANCH }}
 
-      - name: Echo Commit_id
-        id: build
-        run: |
-          echo "COMMIT_ID=$(git log -1 --pretty=format:%h -- .)" >> $GITHUB_OUTPUT
