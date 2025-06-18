@@ -5,7 +5,7 @@ env:
   # Docker镜像配置
   REGISTRY: hub.hitosea.com
   IMAGE_NAME: ttpos-web
-  IMAGE_TAG: ${{ github.event.inputs.branch == 'main' && '' || 'test-' }}
+  #IMAGE_TAG: ${{ github.event.inputs.branch == 'main' && '' || 'test-' }}
   BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
 
 on:
@@ -30,8 +30,13 @@ jobs:
       matrix:
         program: [menu, mobile, member]
     steps:
+      - name: Set IMAGE_TAG
+        id: set_image_tag
+        run: echo "IMAGE_TAG=$(if [ '${{ github.ref }}' == 'refs/heads/main' ]; then echo ''; else echo 'test-'; fi)" >> $GITHUB_ENV
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
           ref: ${{ env.BRANCH }}
+
+
 
