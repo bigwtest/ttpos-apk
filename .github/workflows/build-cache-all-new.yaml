@@ -104,7 +104,7 @@ jobs:
       
       - name: Config SENTRY_DSN
         id: sentry_dsn
-        if: github.event.inputs.branch == 'release'
+        if: github.event.inputs.branch == 'main'
         run: |
           sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_ASSISTANT }}|' apps/assistant/.env.production.local
           sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_KDS }}|' apps/kds/.env.production.local
