@@ -1,13 +1,16 @@
-name: Build macOS App
+name: Build TTPOS macOS App
 
 on:
   workflow_dispatch:
     inputs:
-      repository:
-        description: '目标仓库地址 (格式: owner/repo)'
+      build_type:
+        description: "选择构建类型"
         required: true
-        default: 'innet8/ttpos-flutter'
-        type: string
+        type: choice
+        options:
+          - single
+          - all
+        default: single
       branch:
         description: "选择构建分支"
         required: true
@@ -35,7 +38,6 @@ on:
           - kds
           - tablet
           - shop
-          - all
         default: pos
       base_url:
         description: "选择 API 基础 URL"
@@ -65,7 +67,8 @@ on:
         type: boolean
 
 jobs:
-  build:
+  build-single:
+    if: github.event.inputs.build_type == 'single'
     runs-on: macos-latest
     env:
       PACKAGE_NAME: ${{ github.event.inputs.package_name }}
@@ -95,7 +98,7 @@ jobs:
       scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
       scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
       scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
-    steps:
+    steps: &mac_steps
       - name: 显示构建信息
         shell: bash
         run: |
@@ -112,10 +115,7 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.branch }}
-          fetch-depth: 0
-          token: ${{ secrets.TOKEN }}
 
       - name: 配置 App Store Connect 登录
         shell: bash
@@ -191,58 +191,90 @@ jobs:
           MAC_TABLET_PROFILE_BASE64: ${{ secrets.MAC_TABLET_PROFILE_BASE64 }}
           MAC_SHOP_PROFILE_BASE64: ${{ secrets.MAC_SHOP_PROFILE_BASE64 }}
         run: |
-          set -euo pipefail
-          
-          # 根据 PACKAGE_NAME 选择对应的描述文件
-          ERR_PROFILE_VAR=""
-          case "${PACKAGE_NAME}" in
-            pos)
-              ERR_PROFILE_VAR="MAC_POS_PROFILE_BASE64"
-              MAC_DEV_PROFILE_BASE64="${MAC_POS_PROFILE_BASE64}"
-              ;;
-            assistant)
-              ERR_PROFILE_VAR="MAC_ASSISTANT_PROFILE_BASE64"
-              MAC_DEV_PROFILE_BASE64="${MAC_ASSISTANT_PROFILE_BASE64}"
-              ;;
-            kds)
-              ERR_PROFILE_VAR="MAC_KDS_PROFILE_BASE64"
-              MAC_DEV_PROFILE_BASE64="${MAC_KDS_PROFILE_BASE64}"
-              ;;
-            tablet)
-              ERR_PROFILE_VAR="MAC_TABLET_PROFILE_BASE64"
-              MAC_DEV_PROFILE_BASE64="${MAC_TABLET_PROFILE_BASE64}"
-              ;;
-            shop)
-              ERR_PROFILE_VAR="MAC_SHOP_PROFILE_BASE64"
-              MAC_DEV_PROFILE_BASE64="${MAC_SHOP_PROFILE_BASE64}"
-              ;;
-            *)
-              echo "未知的包名: ${PACKAGE_NAME}，跳过描述文件安装"
-              exit 0
-              ;;
-          esac
-          
-          if [ -z "${MAC_DEV_PROFILE_BASE64}" ]; then
-            echo "未配置 ${ERR_PROFILE_VAR} 描述文件，跳过安装"
-            echo "如需使用描述文件，请在 GitHub Secrets 中配置: ${ERR_PROFILE_VAR}"
-            exit 0
-          fi
-          
-          PROFILE_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.provisionprofile"
-          PLIST_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.plist"
-          
-          echo "正在解码并安装 ${PACKAGE_NAME} 应用的描述文件..."
-          echo "$MAC_DEV_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
-          security cms -D -i "$PROFILE_PATH" > "$PLIST_PATH"
-          
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PLIST_PATH")
+          set -e
+          echo "🔧 开始安装 macOS 开发描述文件..."
+          echo "当前 PACKAGE_NAME=${PACKAGE_NAME}"
+
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          
           mkdir -p "$PROFILE_DIR"
-          cp "$PROFILE_PATH" "$PROFILE_DIR/${PROFILE_UUID}.provisionprofile"
-          
-          echo "DEV_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
-          echo "已安装 ${PACKAGE_NAME} 应用的描述文件: $PROFILE_UUID"
+
+          if [ "$PACKAGE_NAME" = "all" ]; then
+            echo "🚀 构建模式为 all，开始安装所有应用的描述文件..."
+            for pkg in pos assistant kds tablet shop; do
+              VAR_NAME="MAC_${pkg^^}_PROFILE_BASE64"
+              PROFILE_VALUE="${!VAR_NAME}"
+
+              if [ -z "$PROFILE_VALUE" ]; then
+                echo "⚠️ 未配置 $VAR_NAME，跳过 $pkg"
+                continue
+              fi
+
+              PROFILE_PATH="$RUNNER_TEMP/mac_${pkg}_profile.provisionprofile"
+              PLIST_PATH="$RUNNER_TEMP/mac_${pkg}_profile.plist"
+
+              echo "$PROFILE_VALUE" | base64 --decode > "$PROFILE_PATH"
+              security cms -D -i "$PROFILE_PATH" > "$PLIST_PATH"
+
+              PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PLIST_PATH" 2>/dev/null || true)
+              if [ -z "$PROFILE_UUID" ]; then
+                echo "❌ 无法解析 $pkg 的描述文件 UUID，可能文件损坏"
+                continue
+              fi
+
+              cp "$PROFILE_PATH" "$PROFILE_DIR/${PROFILE_UUID}.provisionprofile"
+              echo "✅ 已安装 $pkg 的描述文件 (${PROFILE_UUID})"
+            done
+          else
+            case "${PACKAGE_NAME}" in
+              pos)
+                ERR_PROFILE_VAR="MAC_POS_PROFILE_BASE64"
+                MAC_DEV_PROFILE_BASE64="${MAC_POS_PROFILE_BASE64}"
+                ;;
+              assistant)
+                ERR_PROFILE_VAR="MAC_ASSISTANT_PROFILE_BASE64"
+                MAC_DEV_PROFILE_BASE64="${MAC_ASSISTANT_PROFILE_BASE64}"
+                ;;
+              kds)
+                ERR_PROFILE_VAR="MAC_KDS_PROFILE_BASE64"
+                MAC_DEV_PROFILE_BASE64="${MAC_KDS_PROFILE_BASE64}"
+                ;;
+              tablet)
+                ERR_PROFILE_VAR="MAC_TABLET_PROFILE_BASE64"
+                MAC_DEV_PROFILE_BASE64="${MAC_TABLET_PROFILE_BASE64}"
+                ;;
+              shop)
+                ERR_PROFILE_VAR="MAC_SHOP_PROFILE_BASE64"
+                MAC_DEV_PROFILE_BASE64="${MAC_SHOP_PROFILE_BASE64}"
+                ;;
+              *)
+                echo "未知的包名: ${PACKAGE_NAME}，跳过描述文件安装"
+                exit 0
+                ;;
+            esac
+
+            if [ -z "${MAC_DEV_PROFILE_BASE64}" ]; then
+              echo "未配置 ${ERR_PROFILE_VAR} 描述文件，跳过安装"
+              exit 0
+            fi
+
+            PROFILE_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.provisionprofile"
+            PLIST_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.plist"
+
+            echo "$MAC_DEV_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+            security cms -D -i "$PROFILE_PATH" > "$PLIST_PATH"
+
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PLIST_PATH" 2>/dev/null || true)
+            if [ -z "$PROFILE_UUID" ]; then
+              echo "❌ 无法解析描述文件 UUID，文件可能损坏"
+              exit 1
+            fi
+
+            cp "$PROFILE_PATH" "$PROFILE_DIR/${PROFILE_UUID}.provisionprofile"
+            echo "✅ 已安装 ${PACKAGE_NAME} 的描述文件 (${PROFILE_UUID})"
+          fi
+
+          echo "📁 当前已安装的描述文件："
+          ls -l "$PROFILE_DIR" || echo "(未检测到任何文件)"
 
       - name: 设置默认钥匙串
         shell: bash
@@ -289,15 +321,10 @@ jobs:
       - name: 更新环境变量文件
         shell: bash
         run: |
-          ENV_FILE="apps/${PACKAGE_NAME}/.env.production.local"
-          if [ ! -f "$ENV_FILE" ]; then
-            echo "未找到环境文件: $ENV_FILE" >&2
-            exit 1
-          fi
-          sed -i '' "s|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|" "$ENV_FILE"
-          sed -i '' "s|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|" "$ENV_FILE"
+          sed -i '' 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/assistant/.env.production.local apps/kds/.env.production.local apps/pos/.env.production.local apps/tablet/.env.production.local apps/shop/.env.production.local
+          sed -i '' 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/assistant/.env.production.local apps/kds/.env.production.local apps/pos/.env.production.local apps/tablet/.env.production.local apps/shop/.env.production.local
           echo "更新后的环境文件内容:";
-          cat "$ENV_FILE"
+          cat ./apps/assistant/.env.production.local
 
       - name: 设置构建环境变量
         id: build_meta
@@ -352,7 +379,7 @@ jobs:
           echo "MAC_SIGNING_TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
 
 
-      - name: 构建 macOS 应用
+      - name: 构建 macOS 应用（单包）
         shell: bash
         env:
           KEYCHAIN_PATH: ${{ env.KEYCHAIN_PATH }}
@@ -365,74 +392,33 @@ jobs:
           fi
           security default-keychain -s "$KEYCHAIN_PATH"
           security unlock-keychain -p "${MAC_KEYCHAIN_PASSWORD:-github-actions}" "$KEYCHAIN_PATH"
-          if [ "$PACKAGE_NAME" = "all" ]; then
-            echo "构建所有应用..."
-            for package in pos assistant kds tablet shop; do
-              echo "构建 $package..."
-              dart run ./scripts/build_mac.dart --env=${BUILD_ENV} --package=${package}
-            done
-          else
-            echo "构建单个应用: $PACKAGE_NAME"
-            dart run ./scripts/build_mac.dart --env=${BUILD_ENV} --package=${PACKAGE_NAME}
-          fi
+          echo "构建单个应用: $PACKAGE_NAME"
+          dart run ./scripts/build_mac.dart --env=${BUILD_ENV} --package=${PACKAGE_NAME}
 
-      - name: 准备构建产物
+      - name: 准备构建产物（单包）
         shell: bash
         run: |
           set -euo pipefail
-          
-          if [ "$PACKAGE_NAME" = "all" ]; then
-            echo "准备所有应用的构建产物..."
-            BUILT_PACKAGES=""
-            for package in pos assistant kds tablet shop; do
-              echo "处理 $package 的构建产物..."
-              PACKAGE_DIR="apps/${package}"
-              BUILD_OUTPUT_DIR="${PACKAGE_DIR}/build/macos/Build/Products/Release"
-              if [ ! -d "$BUILD_OUTPUT_DIR" ]; then
-                echo "未找到 $package 的构建输出目录: $BUILD_OUTPUT_DIR" >&2
-                continue
-              fi
-              APP_SOURCE=$(find "$BUILD_OUTPUT_DIR" -maxdepth 1 -type d -name "*.app" | head -n 1)
-              if [ -z "$APP_SOURCE" ]; then
-                echo "未在 $package 的 $BUILD_OUTPUT_DIR 中找到 .app 文件" >&2
-                ls -al "$BUILD_OUTPUT_DIR"
-                continue
-              fi
-              TARGET_DIR="releases/${package}/${MELOS_PACKAGE_VERSION}"
-              mkdir -p "$TARGET_DIR"
-              TARGET_APP="$TARGET_DIR/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.app"
-              rm -rf "$TARGET_APP"
-              cp -R "$APP_SOURCE" "$TARGET_APP"
-              echo "APP_${package^^}_PATH=$TARGET_APP" >> "$GITHUB_ENV"
-              echo "TARGET_${package^^}_DIR=$TARGET_DIR" >> "$GITHUB_ENV"
-              echo "已复制 $package 应用到: $TARGET_APP"
-              BUILT_PACKAGES="$BUILT_PACKAGES $package"
-            done
-            echo "BUILT_PACKAGES=$BUILT_PACKAGES" >> "$GITHUB_ENV"
-            echo "成功构建的包: $BUILT_PACKAGES"
-          else
-            echo "准备单个应用的构建产物..."
-            PACKAGE_DIR="apps/${PACKAGE_NAME}"
-            BUILD_OUTPUT_DIR="${PACKAGE_DIR}/build/macos/Build/Products/Release"
-            if [ ! -d "$BUILD_OUTPUT_DIR" ]; then
-              echo "未找到构建输出目录: $BUILD_OUTPUT_DIR" >&2
-              exit 1
-            fi
-            APP_SOURCE=$(find "$BUILD_OUTPUT_DIR" -maxdepth 1 -type d -name "*.app" | head -n 1)
-            if [ -z "$APP_SOURCE" ]; then
-              echo "未在 $BUILD_OUTPUT_DIR 中找到 .app 文件" >&2
-              ls -al "$BUILD_OUTPUT_DIR"
-              exit 1
-            fi
-            TARGET_DIR="releases/${PACKAGE_NAME}/${MELOS_PACKAGE_VERSION}"
-            mkdir -p "$TARGET_DIR"
-            TARGET_APP="$TARGET_DIR/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.app"
-            rm -rf "$TARGET_APP"
-            cp -R "$APP_SOURCE" "$TARGET_APP"
-            echo "TARGET_DIR=$TARGET_DIR" >> "$GITHUB_ENV"
-            echo "APP_PATH=$TARGET_APP" >> "$GITHUB_ENV"
-            echo "已复制应用到: $TARGET_APP"
+          PACKAGE_DIR="apps/${PACKAGE_NAME}"
+          BUILD_OUTPUT_DIR="${PACKAGE_DIR}/build/macos/Build/Products/Release"
+          if [ ! -d "$BUILD_OUTPUT_DIR" ]; then
+            echo "未找到构建输出目录: $BUILD_OUTPUT_DIR" >&2
+            exit 1
           fi
+          APP_SOURCE=$(find "$BUILD_OUTPUT_DIR" -maxdepth 1 -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_SOURCE" ]; then
+            echo "未在 $BUILD_OUTPUT_DIR 中找到 .app 文件" >&2
+            ls -al "$BUILD_OUTPUT_DIR"
+            exit 1
+          fi
+          TARGET_DIR="releases/${PACKAGE_NAME}/${MELOS_PACKAGE_VERSION}"
+          mkdir -p "$TARGET_DIR"
+          TARGET_APP="$TARGET_DIR/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.app"
+          rm -rf "$TARGET_APP"
+          cp -R "$APP_SOURCE" "$TARGET_APP"
+          echo "TARGET_DIR=$TARGET_DIR" >> "$GITHUB_ENV"
+          echo "APP_PATH=$TARGET_APP" >> "$GITHUB_ENV"
+          echo "已复制应用到: $TARGET_APP"
 
       - name: 调试文件系统结构
         shell: bash
@@ -456,7 +442,7 @@ jobs:
           echo "=== 检查权限文件 ==="
           find "apps/${PACKAGE_NAME}/macos/Runner/" -name "*.entitlements" -type f || echo "未找到权限文件"
 
-      - name: 代码签名 .app
+      - name: 代码签名 .app（单包）
         shell: bash
         env:
           MAC_SIGNING_IDENTITY: ${{ env.MAC_SIGNING_IDENTITY }}
@@ -573,59 +559,54 @@ jobs:
             echo "$package 应用签名完成!"
           }
           
-          if [ "$PACKAGE_NAME" = "all" ]; then
-            echo "签名所有应用..."
-            for package in pos assistant kds tablet shop; do
-              app_path_var="APP_${package^^}_PATH"
-              app_path="${!app_path_var}"
-              if [ -n "$app_path" ] && [ -f "$app_path" ]; then
-                sign_app "$package" "$app_path"
-              else
-                echo "跳过 $package: 未找到应用路径"
-              fi
-            done
-          else
-            echo "签名单个应用: $PACKAGE_NAME"
-            sign_app "$PACKAGE_NAME" "$APP_PATH"
-          fi
+          echo "签名单个应用: $PACKAGE_NAME"
+          sign_app "$PACKAGE_NAME" "$APP_PATH"
 
-      - name: 创建 DMG
+      - name: 创建 DMG（单包）
         shell: bash
         run: |
           set -euo pipefail
-          
-          if [ "$PACKAGE_NAME" = "all" ]; then
-            echo "创建所有应用的 DMG..."
-            DMG_PATHS=""
-            for package in pos assistant kds tablet shop; do
-              app_path_var="APP_${package^^}_PATH"
-              target_dir_var="TARGET_${package^^}_DIR"
-              app_path="${!app_path_var}"
-              target_dir="${!target_dir_var}"
-              
-              if [ -n "$app_path" ] && [ -f "$app_path" ] && [ -n "$target_dir" ]; then
-                echo "创建 $package 的 DMG..."
-                dmg_path="${target_dir}/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.dmg"
-                rm -f "$dmg_path"
-                hdiutil create -volname "${APP_DISPLAY_NAME}" -srcfolder "$app_path" -ov -format UDZO "$dmg_path"
-                echo "DMG_${package^^}_PATH=$dmg_path" >> "$GITHUB_ENV"
-                echo "已生成 $package DMG: $dmg_path"
-                DMG_PATHS="$DMG_PATHS $dmg_path"
-              else
-                echo "跳过 $package: 未找到应用路径或目标目录"
-              fi
-            done
-            echo "ALL_DMG_PATHS=$DMG_PATHS" >> "$GITHUB_ENV"
-          else
-            echo "创建单个应用的 DMG..."
-            DMG_PATH="${TARGET_DIR}/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.dmg"
-            rm -f "$DMG_PATH"
-            hdiutil create -volname "${APP_DISPLAY_NAME}" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
-            echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
-            echo "已生成 DMG: $DMG_PATH"
-          fi
+          DMG_PATH="${TARGET_DIR}/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.dmg"
+          rm -f "$DMG_PATH"
+          hdiutil create -volname "${APP_DISPLAY_NAME}" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
+          echo "已生成 DMG: $DMG_PATH"
 
-      - name: 签名 DMG
+  build-all:
+    if: github.event.inputs.build_type == 'all'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        pkg: [pos, assistant, kds, tablet, shop]
+      fail-fast: false
+    env:
+      PACKAGE_NAME: ${{ matrix.pkg }}
+      BUILD_ENV: ${{ github.event.inputs.env }}
+      BRANCH_NAME: ${{ github.event.inputs.branch }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MAC_KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
+      UPLOAD_TO_STORAGE: ${{ github.event.inputs.upload_to_storage }}
+      UPLOAD_TO_WEB: ${{ github.event.inputs.upload_to_web }}
+      assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Assistant/' || 'dc_apk/TTPOS/Test/MacOS/Assistant/' }}
+      kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Kitchen/' || 'dc_apk/TTPOS/Test/MacOS/Kitchen/' }}
+      tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Menu/' || 'dc_apk/TTPOS/Test/MacOS/Menu/' }}
+      pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Cashier/' || 'dc_apk/TTPOS/Test/MacOS/Cashier/' }}
+      shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Shop/' || 'dc_apk/TTPOS/Test/MacOS/Shop/' }}
+      scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
+      scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
+      scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
+      scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
+      scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
+      scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Assistant/' }}
+      scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Kitchen/' }}
+      scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
+      scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
+      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
+    steps: *mac_steps
+
+      - name: 签名 DMG（单包）
         shell: bash
         env:
           MAC_SIGNING_IDENTITY: ${{ env.MAC_SIGNING_IDENTITY }}
@@ -662,21 +643,8 @@ jobs:
             codesign -dvv "$dmg_path" 2>&1 | head -20 || true
           }
           
-          if [ "$PACKAGE_NAME" = "all" ]; then
-            echo "签名所有 DMG..."
-            for package in pos assistant kds tablet shop; do
-              dmg_path_var="DMG_${package^^}_PATH"
-              dmg_path="${!dmg_path_var}"
-              if [ -n "$dmg_path" ] && [ -f "$dmg_path" ]; then
-                sign_dmg "$package" "$dmg_path"
-              else
-                echo "跳过 $package: 未找到 DMG 路径"
-              fi
-            done
-          else
-            echo "签名单个 DMG: $PACKAGE_NAME"
-            sign_dmg "$PACKAGE_NAME" "$DMG_PATH"
-          fi
+          echo "签名单个 DMG: $PACKAGE_NAME"
+          sign_dmg "$PACKAGE_NAME" "$DMG_PATH"
 
       - name: 判断是否需要公证
         id: notarize_flag
@@ -782,17 +750,11 @@ jobs:
           # 清理临时文件
           rm -f /tmp/notary_output.txt
 
-      - name: 上传构建产物
+      - name: 上传构建产物（单包）
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ github.event.inputs.package_name }}-${{ env.MELOS_PACKAGE_VERSION }}
-          path: |
-            ${{ env.DMG_PATH }}
-            ${{ env.DMG_POS_PATH }}
-            ${{ env.DMG_ASSISTANT_PATH }}
-            ${{ env.DMG_KDS_PATH }}
-            ${{ env.DMG_TABLET_PATH }}
-            ${{ env.DMG_SHOP_PATH }}
+          path: ${{ env.DMG_PATH }}
           if-no-files-found: error
 
       - name: 上传到 Google Cloud Storage
@@ -801,22 +763,16 @@ jobs:
         with:
           credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
 
-      - name: 上传 DMG 到存储桶
+      - name: 上传 DMG 到存储桶（单包）
         if: ${{ env.UPLOAD_TO_STORAGE == 'true' }}
         id: "upload-storage"
         uses: "google-github-actions/upload-cloud-storage@v2"
         with:
-          path: |
-            ${{ env.DMG_PATH }}
-            ${{ env.DMG_POS_PATH }}
-            ${{ env.DMG_ASSISTANT_PATH }}
-            ${{ env.DMG_KDS_PATH }}
-            ${{ env.DMG_TABLET_PATH }}
-            ${{ env.DMG_SHOP_PATH }}
+          path: ${{ env.DMG_PATH }}
           destination: ${{ env[format('{0}_path', github.event.inputs.package_name)] }}
           parent: false
 
-      - name: 上传到 Web 服务器
+      - name: 上传到 Web 服务器（单包）
         if: ${{ env.UPLOAD_TO_WEB == 'true' }}
         uses: Comori/ssh@v0.0.7
         with:
@@ -824,31 +780,11 @@ jobs:
           username: ${{ secrets.SCP_S_USER }}
           privateKey: ${{ secrets.SCP_S_PIVATEKEY }}
           command: |
-            if [ "$PACKAGE_NAME" = "all" ]; then
-              for package in pos assistant kds tablet shop; do
-                dmg_path_var="DMG_${package^^}_PATH"
-                dmg_path="${!dmg_path_var}"
-                scp_target_var="scp_d_${package}"
-                scp_target="${!scp_target_var}"
-                if [ -n "$dmg_path" ] && [ -f "$dmg_path" ]; then
-                  echo "上传 $package DMG 到服务器..."
-                  scp "$dmg_path" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
-                else
-                  echo "⚠️ 跳过 $package：未找到 DMG 文件。"
-                fi
-              done
-            else
-              scp_target_var="scp_d_${PACKAGE_NAME}"
-              scp_target="${!scp_target_var}"
-              echo "上传 $PACKAGE_NAME DMG 到服务器..."
-              scp "$DMG_PATH" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
-            fi
+            scp_target_var="scp_d_${PACKAGE_NAME}"
+            scp_target="${!scp_target_var}"
+            echo "上传 $PACKAGE_NAME DMG 到服务器..."
+            scp "$DMG_PATH" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
           sourceFiles: |
             ${{ env.DMG_PATH }}
-            ${{ env.DMG_POS_PATH }}
-            ${{ env.DMG_ASSISTANT_PATH }}
-            ${{ env.DMG_KDS_PATH }}
-            ${{ env.DMG_TABLET_PATH }}
-            ${{ env.DMG_SHOP_PATH }}
-          targetDir: ${{ env.scp_s_default }}
+          targetDir: ${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}
           scpFirst: true
