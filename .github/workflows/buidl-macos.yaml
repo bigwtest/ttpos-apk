@@ -430,36 +430,61 @@ jobs:
           echo "使用签名身份: ${MAC_SIGNING_IDENTITY}"
           echo "权限文件: ${ENTITLEMENTS_PATH:-无}"
           
-          # 签名内部二进制文件
+          # 签名内部二进制文件（包括 Sparkle 框架内的组件）
           echo "签名内部二进制文件..."
+          
+          # 1. 签名所有 .dylib, .so, .metallib 文件
           if find "${APP_PATH}" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.metallib" \) -print0 | grep -q .; then
             find "${APP_PATH}" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.metallib" \) -print0 | while IFS= read -r -d '' ITEM; do
-              echo "签名: $ITEM"
-              codesign --force --options runtime --sign "$MAC_SIGNING_IDENTITY" "$ITEM"
+              echo "签名库文件: $ITEM"
+              codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$ITEM"
             done
           else
-            echo "未找到需要签名的内部二进制文件"
+            echo "未找到需要签名的库文件"
           fi
           
-          # 签名框架
+          # 2. 签名所有可执行文件（包括 Sparkle 框架内的 Updater, Autoupdate 等）
+          echo "签名可执行文件..."
+          find "${APP_PATH}" -type f -perm +111 -exec file {} \; | grep -E "(Mach-O|executable)" | cut -d: -f1 | while read -r binary; do
+            if [ -f "$binary" ]; then
+              echo "签名可执行文件: $binary"
+              codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$binary"
+            fi
+          done
+          
+          # 3. 签名所有 .app 包（包括嵌套的，如 Sparkle 的 Updater.app）
+          echo "签名应用包..."
+          find "${APP_PATH}" -name "*.app" -type d | while read -r app_bundle; do
+            echo "签名应用包: $app_bundle"
+            codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$app_bundle"
+          done
+          
+          # 4. 签名所有 .xpc 服务（Sparkle 的 XPC 服务）
+          echo "签名 XPC 服务..."
+          find "${APP_PATH}" -name "*.xpc" -type d | while read -r xpc_bundle; do
+            echo "签名 XPC 服务: $xpc_bundle"
+            codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$xpc_bundle"
+          done
+          
+          # 5. 签名所有框架（包括 Sparkle.framework）
           echo "签名框架..."
           if find "${APP_PATH}" -type d -name "*.framework" -print0 | grep -q .; then
             find "${APP_PATH}" -type d -name "*.framework" -print0 | while IFS= read -r -d '' FW; do
               echo "签名框架: $FW"
-              codesign --force --options runtime --sign "$MAC_SIGNING_IDENTITY" "$FW"
+              codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$FW"
             done
           else
             echo "未找到需要签名的框架"
           fi
           
-          # 签名主应用
+          # 6. 最后签名主应用包
           echo "签名主应用..."
           if [ -n "$ENTITLEMENTS_PATH" ] && [ -f "$ENTITLEMENTS_PATH" ]; then
             echo "使用权限文件: $ENTITLEMENTS_PATH"
-            codesign --force --options runtime --entitlements "$ENTITLEMENTS_PATH" --sign "$MAC_SIGNING_IDENTITY" "$APP_PATH"
+            codesign --force --timestamp --options runtime --entitlements "$ENTITLEMENTS_PATH" --sign "$MAC_SIGNING_IDENTITY" "$APP_PATH"
           else
             echo "不使用权限文件进行签名"
-            codesign --force --options runtime --sign "$MAC_SIGNING_IDENTITY" "$APP_PATH"
+            codesign --force --timestamp --options runtime --sign "$MAC_SIGNING_IDENTITY" "$APP_PATH"
           fi
           
           # 验证签名
