@@ -572,40 +572,6 @@ jobs:
           echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
           echo "已生成 DMG: $DMG_PATH"
 
-  build-all:
-    if: github.event.inputs.build_type == 'all'
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        pkg: [pos, assistant, kds, tablet, shop]
-      fail-fast: false
-    env:
-      PACKAGE_NAME: ${{ matrix.pkg }}
-      BUILD_ENV: ${{ github.event.inputs.env }}
-      BRANCH_NAME: ${{ github.event.inputs.branch }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      MAC_KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
-      UPLOAD_TO_STORAGE: ${{ github.event.inputs.upload_to_storage }}
-      UPLOAD_TO_WEB: ${{ github.event.inputs.upload_to_web }}
-      assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Assistant/' || 'dc_apk/TTPOS/Test/MacOS/Assistant/' }}
-      kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Kitchen/' || 'dc_apk/TTPOS/Test/MacOS/Kitchen/' }}
-      tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Menu/' || 'dc_apk/TTPOS/Test/MacOS/Menu/' }}
-      pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Cashier/' || 'dc_apk/TTPOS/Test/MacOS/Cashier/' }}
-      shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Shop/' || 'dc_apk/TTPOS/Test/MacOS/Shop/' }}
-      scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
-      scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
-      scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
-      scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
-      scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
-      scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Assistant/' }}
-      scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Kitchen/' }}
-      scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
-      scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
-      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
-    steps: *mac_steps
-
       - name: 签名 DMG（单包）
         shell: bash
         env:
@@ -623,28 +589,18 @@ jobs:
           security default-keychain -s "$KEYCHAIN_PATH"
           security unlock-keychain -p "${MAC_KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
           
-          # 签名单个 DMG 的函数
-          sign_dmg() {
-            local package="$1"
-            local dmg_path="$2"
-            
-            echo "开始签名 $package DMG: $dmg_path"
-            echo "使用签名身份: ${MAC_SIGNING_IDENTITY}"
-            
-            # 签名 DMG
-            codesign --force --sign "$MAC_SIGNING_IDENTITY" "$dmg_path"
-            
-            echo "验证 $package DMG 签名..."
-            codesign --verify "$dmg_path"
-            
-            # 显示签名详细信息
-            echo ""
-            echo "$package DMG 签名信息:"
-            codesign -dvv "$dmg_path" 2>&1 | head -20 || true
-          }
+          echo "开始签名 $PACKAGE_NAME DMG: $DMG_PATH"
+          echo "使用签名身份: ${MAC_SIGNING_IDENTITY}"
           
-          echo "签名单个 DMG: $PACKAGE_NAME"
-          sign_dmg "$PACKAGE_NAME" "$DMG_PATH"
+          # 签名 DMG
+          codesign --force --sign "$MAC_SIGNING_IDENTITY" "$DMG_PATH"
+          
+          echo "验证 $PACKAGE_NAME DMG 签名..."
+          codesign --verify "$DMG_PATH"
+          
+          echo ""
+          echo "$PACKAGE_NAME DMG 签名信息:"
+          codesign -dvv "$DMG_PATH" 2>&1 | head -20 || true
 
       - name: 判断是否需要公证
         id: notarize_flag
@@ -753,7 +709,7 @@ jobs:
       - name: 上传构建产物（单包）
         uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ github.event.inputs.package_name }}-${{ env.MELOS_PACKAGE_VERSION }}
+          name: macos-${{ env.PACKAGE_NAME }}-${{ env.MELOS_PACKAGE_VERSION }}
           path: ${{ env.DMG_PATH }}
           if-no-files-found: error
 
@@ -769,7 +725,7 @@ jobs:
         uses: "google-github-actions/upload-cloud-storage@v2"
         with:
           path: ${{ env.DMG_PATH }}
-          destination: ${{ env[format('{0}_path', github.event.inputs.package_name)] }}
+          destination: ${{ env[format('{0}_path', env.PACKAGE_NAME)] }}
           parent: false
 
       - name: 上传到 Web 服务器（单包）
@@ -786,5 +742,39 @@ jobs:
             scp "$DMG_PATH" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
           sourceFiles: |
             ${{ env.DMG_PATH }}
-          targetDir: ${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}
+          targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
           scpFirst: true
+
+  build-all:
+    if: github.event.inputs.build_type == 'all'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        pkg: [pos, assistant, kds, tablet, shop]
+      fail-fast: false
+    env:
+      PACKAGE_NAME: ${{ matrix.pkg }}
+      BUILD_ENV: ${{ github.event.inputs.env }}
+      BRANCH_NAME: ${{ github.event.inputs.branch }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MAC_KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
+      UPLOAD_TO_STORAGE: ${{ github.event.inputs.upload_to_storage }}
+      UPLOAD_TO_WEB: ${{ github.event.inputs.upload_to_web }}
+      assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Assistant/' || 'dc_apk/TTPOS/Test/MacOS/Assistant/' }}
+      kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Kitchen/' || 'dc_apk/TTPOS/Test/MacOS/Kitchen/' }}
+      tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Menu/' || 'dc_apk/TTPOS/Test/MacOS/Menu/' }}
+      pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Cashier/' || 'dc_apk/TTPOS/Test/MacOS/Cashier/' }}
+      shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Shop/' || 'dc_apk/TTPOS/Test/MacOS/Shop/' }}
+      scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
+      scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
+      scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
+      scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
+      scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
+      scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Assistant/' }}
+      scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Kitchen/' }}
+      scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
+      scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
+      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
+    steps: *mac_steps
