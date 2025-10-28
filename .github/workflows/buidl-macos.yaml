@@ -3,6 +3,11 @@ name: Build TTPOS macOS App
 on:
   workflow_dispatch:
     inputs:
+      repository:
+        description: '目标仓库地址 (格式: owner/repo)'
+        required: true
+        default: 'innet8/ttpos-flutter'
+        type: string
       build_type:
         description: "选择构建类型"
         required: true
@@ -115,7 +120,10 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.inputs.repository }}
           ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
 
       - name: 配置 App Store Connect 登录
         shell: bash
