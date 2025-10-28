@@ -819,20 +819,26 @@ jobs:
         with:
           host: ${{ secrets.SCP_S_HOST }}
           username: ${{ secrets.SCP_S_USER }}
-          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          privateKey: ${{ secrets.SCP_S_PIVATEKEY }}
           command: |
             if [ "$PACKAGE_NAME" = "all" ]; then
               for package in pos assistant kds tablet shop; do
                 dmg_path_var="DMG_${package^^}_PATH"
                 dmg_path="${!dmg_path_var}"
+                scp_target_var="scp_d_${package}"
+                scp_target="${!scp_target_var}"
                 if [ -n "$dmg_path" ] && [ -f "$dmg_path" ]; then
                   echo "上传 $package DMG 到服务器..."
-                  scp "$dmg_path" ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', package)] }}
+                  scp "$dmg_path" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
+                else
+                  echo "⚠️ 跳过 $package：未找到 DMG 文件。"
                 fi
               done
             else
+              scp_target_var="scp_d_${PACKAGE_NAME}"
+              scp_target="${!scp_target_var}"
               echo "上传 $PACKAGE_NAME DMG 到服务器..."
-              scp "$DMG_PATH" ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', github.event.inputs.package_name)] }}
+              scp "$DMG_PATH" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${scp_target}"
             fi
           sourceFiles: |
             ${{ env.DMG_PATH }}
@@ -841,5 +847,5 @@ jobs:
             ${{ env.DMG_KDS_PATH }}
             ${{ env.DMG_TABLET_PATH }}
             ${{ env.DMG_SHOP_PATH }}
-          targetDir: ${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}
+          targetDir: ${{ env.scp_s_default }}
           scpFirst: true
