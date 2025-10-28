@@ -78,20 +78,23 @@ jobs:
       UPLOAD_TO_STORAGE: ${{ github.event.inputs.upload_to_storage }}
       UPLOAD_TO_WEB: ${{ github.event.inputs.upload_to_web }}
       # 存储桶路径
-      assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Assistant/' || 'dc_apk/TTPOS/Test/Assistant/' }}
-      kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kitchen/' || 'dc_apk/TTPOS/Test/Kitchen/' }}
-      tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Menu/' || 'dc_apk/TTPOS/Test/Menu/' }}
-      pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Cashier/' || 'dc_apk/TTPOS/Test/Cashier/' }}
+      assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Assistant/' || 'dc_apk/TTPOS/Test/MacOS/Assistant/' }}
+      kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Kitchen/' || 'dc_apk/TTPOS/Test/MacOS/Kitchen/' }}
+      tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Menu/' || 'dc_apk/TTPOS/Test/MacOS/Menu/' }}
+      pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Cashier/' || 'dc_apk/TTPOS/Test/MacOS/Cashier/' }}
+      shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/MacOS/Shop/' || 'dc_apk/TTPOS/Test/MacOS/Shop/' }}
       # 中转服务器路径
       scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
       scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
       scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
       scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
+      scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
       # 最终下载路径：www.ttpos.com/downloads
       scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Assistant/' }}
       scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Kitchen/' }}
       scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
       scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
+      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
     steps:
       - name: 显示构建信息
         shell: bash
