@@ -180,12 +180,12 @@ jobs:
       - name: 检查构建产物
         run: |
           $exeName = switch ("${{ github.event.inputs.package_name }}") {
-            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
-            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
-            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
-            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
-            default { "${{ github.event.inputs.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ github.event.inputs.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
           }
           $exePath = ".\releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
           if (-not (Test-Path $exePath)) {
@@ -236,24 +236,34 @@ jobs:
         if: github.event.inputs.scp == 'on'
         shell: pwsh
         run: |
-          $exeName = switch ("${{ github.event.inputs.package_name }}") {
-            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
-            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
-            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
-            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
-            default { "${{ github.event.inputs.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          $packageName = "${{ github.event.inputs.package_name }}"
+          $version = "${{ env.MELOS_PACKAGE_VERSION }}"
+          
+          $exeName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "kds" { "TTPOS-Kitchen-V$version.exe" }
+            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "tablet" { "TTPOS-Menu-V$version.exe" }
+            "shop" { "TTPOS-Shop-V$version.exe" }
+            default { "$packageName-V$version.exe" }
           }
-          $exePath = ".\releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          
+          $latestName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-latest.exe" }
+            "kds" { "TTPOS-Kitchen-latest.exe" }
+            "assistant" { "TTPOS-Assistant-latest.exe" }
+            "tablet" { "TTPOS-Menu-latest.exe" }
+            "shop" { "TTPOS-Shop-latest.exe" }
+            default { "TTPOS-$packageName-latest.exe" }
+          }
+          
+          $exePath = ".\\releases\\$packageName\\$version\\$exeName"
           if (-not (Test-Path $exePath)) {
             Write-Host "警告：未找到 $exePath，跳过传输。"
             exit 0
           }
 
-          # 私钥文件路径
-          $privateKeyPath = "$env:USERPROFILE\.ssh\id_rsa"
-          
-          # 使用环境变量中的路径
+          $privateKeyPath = "$env:USERPROFILE\\.ssh\\id_rsa"
           $scpSourcePath = "${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}"
           $scpTargetPath = "${{ env[format('scp_d_{0}', github.event.inputs.package_name)] }}"
           $targetServer = "${{ secrets.SCP_D_HOST }}"
@@ -261,74 +271,19 @@ jobs:
           $forwardUser = "${{ secrets.SCP_S_USER }}"
           $targetUser = "${{ secrets.SCP_D_USER }}"
           
-          Write-Host "开始传输 ${{ github.event.inputs.package_name }} 应用..."
-          Write-Host "中转路径: $scpSourcePath"
-          Write-Host "目标路径: $scpTargetPath"
-          Write-Host "使用私钥: $privateKeyPath"
+          $sshOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
+          $scpOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
 
-          # SSH 选项
-          $sshOptions = @(
-            "-i", $privateKeyPath,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null"
-          )
-
-          # SCP 选项：禁用主机密钥检查，启用详细输出
-          $scpOptions = @(
-            "-i", $privateKeyPath,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
-            "-v"
-          )
-
-          # 1. 先在中转服务器上创建目录
           Write-Host "正在中转服务器上创建目录: $scpSourcePath ..."
           & ssh @sshOptions "${forwardUser}@${forwardIp}" "mkdir -p $scpSourcePath"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "在中转服务器上创建目录失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
 
-          # 2. 传输文件到中转服务器
-          Write-Host "正在传输 $exePath 到中转服务器 ${forwardUser}@${forwardIp}:$scpSourcePath ..."
+          Write-Host "正在传输 $exePath 到中转服务器..."
           & scp @scpOptions "$exePath" "${forwardUser}@${forwardIp}:$scpSourcePath"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "传输到中转服务器失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
 
-          # 3. 再由中转服务器传到目标服务器
-          Write-Host "正在从中转服务器 ${forwardIp} 传输 $exeName 到目标服务器 ${targetUser}@${targetServer}:$scpTargetPath ..."
-          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
-            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
-            case \"${{ github.event.inputs.package_name }}\" in
-                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
-                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
-                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
-                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
-                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
-                *) LATEST_NAME=\"TTPOS-${{ github.event.inputs.package_name }}-latest.exe\" ;;
-            esac
-            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName `$LATEST_NAME\"
-          "
-            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
-            case \"${{ github.event.inputs.package_name }}\" in
-                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
-                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
-                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
-                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
-                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
-                *) LATEST_NAME=\"TTPOS-${{ github.event.inputs.package_name }}-latest.exe\" ;;
-            esac
-            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName \$LATEST_NAME\"
-          "
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "传输到目标服务器失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
-
-          Write-Host "${{ github.event.inputs.package_name }} 传输完成！"
-
+          Write-Host "正在从中心中转服务器传输到目标服务器并创建软链..."
+          $remoteCmd = "scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath; " +
+                       "ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} 'cd $scpTargetPath && ln -sf $exeName $latestName'"
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" $remoteCmd
       - name: Upload to Google Cloud Storage
         uses: "google-github-actions/auth@v2"
         with:
@@ -434,12 +389,12 @@ jobs:
       - name: 检查构建产物
         run: |
           $exeName = switch ("${{ matrix.package_name }}") {
-            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
-            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
-            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
-            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
-            default { "${{ matrix.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ matrix.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
           }
           $exePath = ".\releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
           if (-not (Test-Path $exePath)) {
@@ -490,24 +445,34 @@ jobs:
         if: github.event.inputs.scp == 'on'
         shell: pwsh
         run: |
-          $exeName = switch ("${{ matrix.package_name }}") {
-            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
-            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
-            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
-            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
-            default { "${{ matrix.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          $packageName = "${{ matrix.package_name }}"
+          $version = "${{ env.MELOS_PACKAGE_VERSION }}"
+          
+          $exeName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "kds" { "TTPOS-Kitchen-V$version.exe" }
+            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "tablet" { "TTPOS-Menu-V$version.exe" }
+            "shop" { "TTPOS-Shop-V$version.exe" }
+            default { "$packageName-V$version.exe" }
           }
-          $exePath = ".\releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          
+          $latestName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-latest.exe" }
+            "kds" { "TTPOS-Kitchen-latest.exe" }
+            "assistant" { "TTPOS-Assistant-latest.exe" }
+            "tablet" { "TTPOS-Menu-latest.exe" }
+            "shop" { "TTPOS-Shop-latest.exe" }
+            default { "TTPOS-$packageName-latest.exe" }
+          }
+          
+          $exePath = ".\\releases\\$packageName\\$version\\$exeName"
           if (-not (Test-Path $exePath)) {
             Write-Host "警告：未找到 $exePath，跳过传输。"
             exit 0
           }
 
-          # 私钥文件路径
-          $privateKeyPath = "$env:USERPROFILE\.ssh\id_rsa"
-          
-          # 使用环境变量中的路径
+          $privateKeyPath = "$env:USERPROFILE\\.ssh\\id_rsa"
           $scpSourcePath = "${{ env[format('scp_s_{0}', matrix.package_name)] }}"
           $scpTargetPath = "${{ env[format('scp_d_{0}', matrix.package_name)] }}"
           $targetServer = "${{ secrets.SCP_D_HOST }}"
@@ -515,74 +480,19 @@ jobs:
           $forwardUser = "${{ secrets.SCP_S_USER }}"
           $targetUser = "${{ secrets.SCP_D_USER }}"
           
-          Write-Host "开始传输 ${{ matrix.package_name }} 应用..."
-          Write-Host "中转路径: $scpSourcePath"
-          Write-Host "目标路径: $scpTargetPath"
-          Write-Host "使用私钥: $privateKeyPath"
+          $sshOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
+          $scpOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
 
-          # SSH 选项
-          $sshOptions = @(
-            "-i", $privateKeyPath,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null"
-          )
-
-          # SCP 选项：禁用主机密钥检查，启用详细输出
-          $scpOptions = @(
-            "-i", $privateKeyPath,
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "UserKnownHostsFile=/dev/null",
-            "-v"
-          )
-
-          # 1. 先在中转服务器上创建目录
           Write-Host "正在中转服务器上创建目录: $scpSourcePath ..."
           & ssh @sshOptions "${forwardUser}@${forwardIp}" "mkdir -p $scpSourcePath"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "在中转服务器上创建目录失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
-          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
-            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
-            case \"${{ matrix.package_name }}\" in
-                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
-                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
-                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
-                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
-                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
-                *) LATEST_NAME=\"TTPOS-${{ matrix.package_name }}-latest.exe\" ;;
-            esac
-            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName `$LATEST_NAME\"
-          "
-          # 2. 传输文件到中转服务器
-          Write-Host "正在传输 $exePath 到中转服务器 ${forwardUser}@${forwardIp}:$scpSourcePath ..."
+
+          Write-Host "正在传输 $exePath 到中转服务器..."
           & scp @scpOptions "$exePath" "${forwardUser}@${forwardIp}:$scpSourcePath"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "传输到中转服务器失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
 
-          # 3. 再由中转服务器传到目标服务器
-          Write-Host "正在从中转服务器 ${forwardIp} 传输 $exeName 到目标服务器 ${targetUser}@${targetServer}:$scpTargetPath ..."
-          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
-            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
-            case \"${{ matrix.package_name }}\" in
-                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
-                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
-                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
-                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
-                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
-                *) LATEST_NAME=\"TTPOS-${{ matrix.package_name }}-latest.exe\" ;;
-            esac
-            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName \$LATEST_NAME\"
-          "
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "传输到目标服务器失败！退出代码: $LASTEXITCODE"
-            exit 1
-          }
-
-          Write-Host "${{ matrix.package_name }} 传输完成！"
-
+          Write-Host "正在从中转服务器传输到目标服务器并创建软链..."
+          $remoteCmd = "scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath; " +
+                       "ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} 'cd $scpTargetPath && ln -sf $exeName $latestName'"
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" $remoteCmd
       - name: Upload to Google Cloud Storage
         uses: "google-github-actions/auth@v2"
         with:
