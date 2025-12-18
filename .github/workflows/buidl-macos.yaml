@@ -354,11 +354,11 @@ jobs:
             *) echo "不支持的包: $PACKAGE_NAME" >&2; exit 1 ;;
           esac
           echo "APP_DISPLAY_NAME=${APP_NAME}" >> "$GITHUB_ENV"
-          echo "Cashier_name=TTPOS-V${VERSION}.apk" >> $GITHUB_ENV
-          echo "Assistant_name=TTPOS-Go-V${VERSION}.apk" >> $GITHUB_ENV
-          echo "Kitchen_name=TTPOS-Kitchen-V${VERSION}.apk" >> $GITHUB_ENV
-          echo "Menu_name=TTPOS-Menu-V${VERSION}.apk" >> $GITHUB_ENV
-          echo "Shop_name=TTPOS-Shop-V${VERSION}.apk" >> $GITHUB_ENV
+          echo "Cashier_name=TTPOS-V${VERSION}.dmg" >> $GITHUB_ENV
+          echo "Assistant_name=TTPOS-Go-V${VERSION}.dmg" >> $GITHUB_ENV
+          echo "Kitchen_name=TTPOS-Kitchen-V${VERSION}.dmg" >> $GITHUB_ENV
+          echo "Menu_name=TTPOS-Menu-V${VERSION}.dmg" >> $GITHUB_ENV
+          echo "Shop_name=TTPOS-Shop-V${VERSION}.dmg" >> $GITHUB_ENV
           echo "解析到版本号: $VERSION"
 
       - name: 获取签名身份
@@ -752,33 +752,33 @@ jobs:
             # 根据 matrix 判断包名和对应的软链名
             case "${{ env.PACKAGE_NAME }}" in
                 "pos")
-                    LATEST_NAME="TTPOS-latest.apk"
-                    VERSION_APK="${{ env.Cashier_name }}"
+                    LATEST_NAME="TTPOS-latest.dmg"
+                    VERSION_DMG="${{ env.Cashier_name }}"
                     ;;
                 "assistant")
-                    LATEST_NAME="TTPOS-Go-latest.apk"
-                    VERSION_APK="${{ env.Assistant_name }}"
+                    LATEST_NAME="TTPOS-Go-latest.dmg"
+                    VERSION_DMG="${{ env.Assistant_name }}"
                     ;;
                 "kds")
-                    LATEST_NAME="TTPOS-Kitchen-latest.apk"
-                    VERSION_APK="${{ env.Kitchen_name }}"
+                    LATEST_NAME="TTPOS-Kitchen-latest.dmg"
+                    VERSION_DMG="${{ env.Kitchen_name }}"
                     ;;
                 "tablet")
-                    LATEST_NAME="TTPOS-Menu-latest.apk"
-                    VERSION_APK="${{ env.Menu_name }}"
+                    LATEST_NAME="TTPOS-Menu-latest.dmg"
+                    VERSION_DMG="${{ env.Menu_name }}"
                     ;;
                 "shop")
-                    LATEST_NAME="TTPOS-Shop-latest.apk"
-                    VERSION_APK="${{ env.Shop_name }}"
+                    LATEST_NAME="TTPOS-Shop-latest.dmg"
+                    VERSION_DMG="${{ env.Shop_name }}"
                     ;;
             esac
             echo "上传 $PACKAGE_NAME DMG 到服务器..."
-            scp ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}$VERSION_APK  "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
+            scp ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}${VERSION_DMG}  "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
 
             # 2. 在最终服务器创建软链
-            if [ -n "$LATEST_NAME" ] && [ -n "$VERSION_APK" ]; then
-                ssh -o StrictHostKeyChecking=no ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }} "cd ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }} && ln -sf $VERSION_APK $LATEST_NAME"
-                echo "Created symlink: $LATEST_NAME -> $VERSION_APK"
+            if [ -n "$LATEST_NAME" ] && [ -n "$VERSION_DMG" ]; then
+                ssh -o StrictHostKeyChecking=no ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }} "cd ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }} && ln -sf ${VERSION_DMG} ${LATEST_NAME}"
+                echo "Created symlink: ${LATEST_NAME} -> ${VERSION_DMG}"
             fi
           sourceFiles: |
             ${{ env.DMG_PATH }}
@@ -818,3 +818,5 @@ jobs:
       scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
       scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
     steps: *mac_steps
+
+
