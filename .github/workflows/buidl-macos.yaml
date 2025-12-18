@@ -358,12 +358,12 @@ jobs:
           # 根据 matrix 判断包名和对应的软链名
           case "${PACKAGE_NAME}" in
               "pos")
-                  L_NAME="TTPOS-Cashier-latest.dmg"
-                  V_DMG="TTPOS-Cashier-${VERSION}.dmg"
+                  L_NAME="TTPOS-latest.dmg"
+                  V_DMG="TTPOS-${VERSION}.dmg"
                   ;;
               "assistant")
-                  L_NAME="TTPOS-Assistant-latest.dmg"
-                  V_DMG="TTPOS-Assistant-${VERSION}.dmg"
+                  L_NAME="TTPOS-Go-latest.dmg"
+                  V_DMG="TTPOS-Go-${VERSION}.dmg"
                   ;;
               "kds")
                   L_NAME="TTPOS-Kitchen-latest.dmg"
@@ -785,7 +785,6 @@ jobs:
           targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
           scpFirst: true
 
-
   build-all:
     if: github.event.inputs.build_type == 'all'
     runs-on: macos-latest
@@ -819,4 +818,3 @@ jobs:
       scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
       scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
     steps: *mac_steps
-
