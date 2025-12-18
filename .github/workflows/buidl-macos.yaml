@@ -785,6 +785,18 @@ jobs:
           targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
           scpFirst: true
 
+      - name: 上传到 Web 服务器（单包）
+        if: ${{ env.UPLOAD_TO_WEB == 'true' }}
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            echo "在最终服务器创建软链..."
+            ssh -o StrictHostKeyChecking=no "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}" "cd ${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }} && ln -sf ${{ env.VERSION_DMG }} ${{ env.LATEST_NAME }}" 
+
+
   build-all:
     if: github.event.inputs.build_type == 'all'
     runs-on: macos-latest
