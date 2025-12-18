@@ -23,11 +23,6 @@ env:
 on:
   workflow_dispatch:
     inputs:
-      repository:
-        description: '目标仓库地址 (格式: owner/repo)'
-        required: true
-        default: 'innet8/ttpos-flutter'
-        type: string
       branch:
         description: "选择构建分支"
         required: true
@@ -137,12 +132,271 @@ jobs:
           melos bs
 
       - name: 生成环境变量文件
+        shell: pwsh
         run: |
-          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
-          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
-          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
-          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
-          Get-Content apps/${{ matrix.package_name }}/.env.production.local
+          $pkgName = "${{ github.event.inputs.package_name }}"
+          Write-Host "当前处理的包名: [$pkgName]"
+          if (-not $pkgName) {
+            Write-Error "错误：包名 (package_name) 为空。"
+            exit 1
+          }
+
+          $envDir = "apps/$pkgName"
+          $envPath = "$envDir/.env.production.local"
+          $envTemplate = "$envDir/.env.production"
+
+          if (-not (Test-Path $envPath)) {
+            if (Test-Path $envTemplate) {
+              Write-Host "正在从 $envTemplate 创建 $envPath ..."
+              Copy-Item $envTemplate $envPath
+            } else {
+              Write-Host "直接创建空文件 $envPath"
+              New-Item -ItemType File -Path $envPath -Force
+            }
+          }
+
+          $api_url = "${{ github.event.inputs.base_url }}"
+          $ws_url = "${{ github.event.inputs.base_ws_url }}"
+          
+          (Get-Content $envPath) -replace '^API_BASE_URL=.*', "API_BASE_URL=$api_url" | Set-Content $envPath
+          (Get-Content $envPath) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$ws_url" | Set-Content $envPath
+          
+          Write-Host "--- 环境变量文件内容 ($envPath) ---"
+          Get-Content $envPath
+
+      - name: 设置 SENTRY_DSN（仅 release 分支）
+        if: github.event.inputs.branch == 'release'
+        shell: pwsh
+        run: |
+          $envPath = "apps/${{ github.event.inputs.package_name }}/.env.production.local"
+          $dsn = switch ("${{ github.event.inputs.package_name }}") {
+            "assistant" { "${{ secrets.SENTRYDSN_ASSISTANT }}" }
+            "kds" { "${{ secrets.SENTRYDSN_KDS }}" }
+            "pos" { "${{ secrets.SENTRYDSN_POS }}" }
+            "tablet" { "${{ secrets.SENTRYDSN_TABLET }}" }
+            "shop" { "${{ secrets.SENTRYDSN_SHOP }}" }
+            default { "" }
+          }
+          if ($dsn -ne "") {
+            (Get-Content $envPath) -replace '^SENTRY_DSN=.*', "SENTRY_DSN=$dsn" | Set-Content $envPath
+            Write-Host "已设置 SENTRY_DSN=$dsn 到 $envPath"
+          } else {
+            Write-Host "未设置 SENTRY_DSN，包名未匹配。"
+          }
+          
+      - name: 设置环境变量
+        run: |
+          $env:MELOS_PACKAGE_NAME = "${{ github.event.inputs.package_name }}"
+          $version = (Get-Content apps/${{ github.event.inputs.package_name }}/pubspec.yaml | Select-String 'version:' | ForEach-Object { $_.Line.Split(':')[1].Trim() }).Split('+')[0]
+          $env:MELOS_PACKAGE_VERSION = $version
+          echo "MELOS_PACKAGE_NAME=$env:MELOS_PACKAGE_NAME" >> $env:GITHUB_ENV
+          echo "MELOS_PACKAGE_VERSION=$env:MELOS_PACKAGE_VERSION" >> $env:GITHUB_ENV
+
+
+      - name: 构建 Windows 安装包
+        run: |
+          dart run ./scripts/build_win_innosetup.dart --env=${{ github.event.inputs.env }} --package=${{ github.event.inputs.package_name }}
+
+      - name: 检查构建产物
+        run: |
+          $exeName = switch ("${{ github.event.inputs.package_name }}") {
+            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ github.event.inputs.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
+          }
+          $exePath = ".\releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "未找到构建产物: $exePath"
+            exit 1
+          }
+          Write-Host "构建产物存在: $exePath"
+
+      - name: Setup SSH Key
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          # 创建 .ssh 目录
+          $sshDir = "$env:USERPROFILE\.ssh"
+          if (-not (Test-Path $sshDir)) {
+            New-Item -ItemType Directory -Path $sshDir -Force
+          }
+          
+          # 创建私钥文件
+          $privateKeyPath = "$sshDir\id_rsa"
+          "${{ secrets.SCP_S_RIVATEKEY }}" | Out-File -FilePath $privateKeyPath -Encoding UTF8
+          
+          # 设置私钥文件权限（Windows）
+          try {
+            # 移除继承权限
+            icacls $privateKeyPath /inheritance:r /c
+            # 只给当前用户读取权限
+            icacls $privateKeyPath /grant "${env:USERNAME}:R" /c
+            # 移除其他用户的权限
+            icacls $privateKeyPath /remove "Everyone" /c 2>$null
+            icacls $privateKeyPath /remove "Users" /c 2>$null
+            icacls $privateKeyPath /remove "Authenticated Users" /c 2>$null
+            Write-Host "私钥文件权限设置成功"
+          } catch {
+            Write-Host "权限设置失败，但继续执行: $_"
+          }
+          
+          # 验证文件存在
+          if (Test-Path $privateKeyPath) {
+            $fileSize = (Get-Item $privateKeyPath).Length
+            Write-Host "SSH 私钥已设置到: $privateKeyPath (大小: $fileSize 字节)"
+          } else {
+            Write-Error "私钥文件创建失败"
+            exit 1
+          }
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          $packageName = "${{ github.event.inputs.package_name }}"
+          $version = "${{ env.MELOS_PACKAGE_VERSION }}"
+          
+          $exeName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "kds" { "TTPOS-Kitchen-V$version.exe" }
+            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "tablet" { "TTPOS-Menu-V$version.exe" }
+            "shop" { "TTPOS-Shop-V$version.exe" }
+            default { "$packageName-$version.exe" }
+          }
+          
+          $latestName = switch ($packageName) {
+            "pos" { "TTPOS-Cashier-latest.exe" }
+            "kds" { "TTPOS-Kitchen-latest.exe" }
+            "assistant" { "TTPOS-Assistant-latest.exe" }
+            "tablet" { "TTPOS-Menu-latest.exe" }
+            "shop" { "TTPOS-Shop-latest.exe" }
+            default { "TTPOS-$packageName-latest.exe" }
+          }
+          
+          $exePath = ".\\releases\\$packageName\\$version\\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Host "警告：未找到 $exePath，跳过传输。"
+            exit 0
+          }
+
+          $privateKeyPath = "$env:USERPROFILE\\.ssh\\id_rsa"
+          $scpSourcePath = "${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}"
+          $scpTargetPath = "${{ env[format('scp_d_{0}', github.event.inputs.package_name)] }}"
+          $targetServer = "${{ secrets.SCP_D_HOST }}"
+          $forwardIp = "${{ secrets.SCP_S_HOST }}"
+          $forwardUser = "${{ secrets.SCP_S_USER }}"
+          $targetUser = "${{ secrets.SCP_D_USER }}"
+          
+          $sshOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
+          $scpOptions = @("-i", $privateKeyPath, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null")
+
+          Write-Host "正在中转服务器上创建目录: $scpSourcePath ..."
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "mkdir -p $scpSourcePath"
+
+          Write-Host "正在传输 $exePath 到中转服务器..."
+          & scp @scpOptions "$exePath" "${forwardUser}@${forwardIp}:$scpSourcePath"
+
+          Write-Host "正在从中心中转服务器传输到目标服务器并创建软链..."
+          $remoteCmd = "scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath; " +
+                       "ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} 'cd $scpTargetPath && ln -sf $exeName $latestName'"
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" $remoteCmd
+      - name: Upload to Google Cloud Storage
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
+
+      - id: "upload-files"
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: releases/${{ github.event.inputs.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}
+          destination: ${{ env[format('{0}_path', github.event.inputs.package_name)] }}
+          parent: false         
+
+  build-all:
+    if: github.event.inputs.build_type == 'all'
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        package_name: [pos, kds, assistant, tablet, shop]
+      fail-fast: false
+    steps:
+      - name: 显示构建信息
+        run: |
+          Write-Host "========================================="
+          Write-Host "全端构建信息"
+          Write-Host "========================================="
+          Write-Host "应用端: ${{ matrix.package_name }}"
+          Write-Host "分支: ${{ github.event.inputs.branch }}"
+          Write-Host "环境: ${{ github.event.inputs.env }}"
+          Write-Host "构建类型: ${{ github.event.inputs.build_type }}"
+          Write-Host "API URL: ${{ github.event.inputs.base_url }}"
+          Write-Host "WebSocket URL: ${{ github.event.inputs.base_ws_url }}"
+          Write-Host "SCP传输: ${{ github.event.inputs.scp }}"
+          Write-Host "========================================="
+
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart --version
+          dart pub global activate melos
+
+      - name: Melos Init
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+
+      - name: 生成环境变量文件
+        shell: pwsh
+        run: |
+          $pkgName = "${{ matrix.package_name }}"
+          Write-Host "当前处理的包名: [$pkgName]"
+          if (-not $pkgName) {
+            Write-Error "错误：包名 (package_name) 为空。"
+            exit 1
+          }
+
+          $envDir = "apps/$pkgName"
+          $envPath = "$envDir/.env.production.local"
+          $envTemplate = "$envDir/.env.production"
+
+          if (-not (Test-Path $envPath)) {
+            if (Test-Path $envTemplate) {
+              Write-Host "正在从 $envTemplate 创建 $envPath ..."
+              Copy-Item $envTemplate $envPath
+            } else {
+              Write-Host "直接创建空文件 $envPath"
+              New-Item -ItemType File -Path $envPath -Force
+            }
+          }
+
+          $api_url = "${{ github.event.inputs.base_url }}"
+          $ws_url = "${{ github.event.inputs.base_ws_url }}"
+          
+          (Get-Content $envPath) -replace '^API_BASE_URL=.*', "API_BASE_URL=$api_url" | Set-Content $envPath
+          (Get-Content $envPath) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$ws_url" | Set-Content $envPath
+          
+          Write-Host "--- 环境变量文件内容 ($envPath) ---"
+          Get-Content $envPath
 
       - name: 设置 SENTRY_DSN（仅 release 分支）
         if: github.event.inputs.branch == 'release'
@@ -180,12 +434,12 @@ jobs:
       - name: 检查构建产物
         run: |
           $exeName = switch ("${{ matrix.package_name }}") {
-            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
-            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
-            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
-            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
-            default { "${{ matrix.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ matrix.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
           }
           $exePath = ".\releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
           if (-not (Test-Path $exePath)) {
@@ -240,18 +494,18 @@ jobs:
           $version = "${{ env.MELOS_PACKAGE_VERSION }}"
           
           $exeName = switch ($packageName) {
-            "pos" { "TTPOS-$version.exe" }
-            "kds" { "TTPOS-Kitchen-$version.exe" }
-            "assistant" { "TTPOS-Go-$version.exe" }
-            "tablet" { "TTPOS-Menu-$version.exe" }
-            "shop" { "TTPOS-Shop-$version.exe" }
+            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "kds" { "TTPOS-Kitchen-V$version.exe" }
+            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "tablet" { "TTPOS-Menu-V$version.exe" }
+            "shop" { "TTPOS-Shop-V$version.exe" }
             default { "$packageName-$version.exe" }
           }
           
           $latestName = switch ($packageName) {
-            "pos" { "TTPOS-latest.exe" }
+            "pos" { "TTPOS-Cashier-latest.exe" }
             "kds" { "TTPOS-Kitchen-latest.exe" }
-            "assistant" { "TTPOS-Go-latest.exe" }
+            "assistant" { "TTPOS-Assistant-latest.exe" }
             "tablet" { "TTPOS-Menu-latest.exe" }
             "shop" { "TTPOS-Shop-latest.exe" }
             default { "TTPOS-$packageName-latest.exe" }
@@ -296,4 +550,3 @@ jobs:
           destination: ${{ env[format('{0}_path', matrix.package_name)] }}
           parent: false
           
-
