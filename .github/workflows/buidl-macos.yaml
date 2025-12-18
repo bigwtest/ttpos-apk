@@ -359,6 +359,39 @@ jobs:
           echo "Kitchen_name=TTPOS-Kitchen-V${VERSION}.dmg" >> $GITHUB_ENV
           echo "Menu_name=TTPOS-Menu-V${VERSION}.dmg" >> $GITHUB_ENV
           echo "Shop_name=TTPOS-Shop-V${VERSION}.dmg" >> $GITHUB_ENV
+          # 根据 matrix 判断包名和对应的软链名
+          case "${{ env.PACKAGE_NAME }}" in
+              "pos")
+                  LATEST_NAME="TTPOS-latest.dmg"
+                  VERSION_DMG="${{ env.Cashier_name }}"
+                  echo ${LATEST_NAME} >> $GITHUB_ENV
+                  echo ${VERSION_DMG} >> $GITHUB_ENV
+                  ;;
+              "assistant")
+                  LATEST_NAME="TTPOS-Go-latest.dmg"
+                  VERSION_DMG="${{ env.Assistant_name }}"
+                  echo ${LATEST_NAME} >> $GITHUB_ENV
+                  echo ${VERSION_DMG} >> $GITHUB_ENV
+                  ;;
+              "kds")
+                  LATEST_NAME="TTPOS-Kitchen-latest.dmg"
+                  VERSION_DMG="${{ env.Kitchen_name }}"
+                  echo ${LATEST_NAME} >> $GITHUB_ENV
+                  echo ${VERSION_DMG} >> $GITHUB_ENV
+                  ;;
+              "tablet")
+                  LATEST_NAME="TTPOS-Menu-latest.dmg"
+                  VERSION_DMG="${{ env.Menu_name }}"
+                  echo ${LATEST_NAME} >> $GITHUB_ENV
+                  echo ${VERSION_DMG} >> $GITHUB_ENV
+                  ;;
+              "shop")
+                  LATEST_NAME="TTPOS-Shop-latest.dmg"
+                  VERSION_DMG="${{ env.Shop_name }}"
+                  echo ${LATEST_NAME} >> $GITHUB_ENV
+                  echo ${VERSION_DMG} >> $GITHUB_ENV
+                  ;;
+          esac
           echo "解析到版本号: $VERSION"
 
       - name: 获取签名身份
