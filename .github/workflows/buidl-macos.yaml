@@ -354,29 +354,36 @@ jobs:
             *) echo "不支持的包: $PACKAGE_NAME" >&2; exit 1 ;;
           esac
           echo "APP_DISPLAY_NAME=${APP_NAME}" >> "$GITHUB_ENV"
+
           # 根据 matrix 判断包名和对应的软链名
-          case "${{ env.PACKAGE_NAME }}" in
+          case "${PACKAGE_NAME}" in
               "pos")
-                  echo "LATEST_NAME=TTPOS-latest.dmg" >> $GITHUB_ENV
-                  echo "VERSION_DMG=TTPOS-V${VERSION}.dmg" >> $GITHUB_ENV
+                  L_NAME="TTPOS-Cashier-latest.dmg"
+                  V_DMG="TTPOS-Cashier-${VERSION}.dmg"
                   ;;
               "assistant")
-                  echo "LATEST_NAME=TTPOS-Go-latest.dmg" >> $GITHUB_ENV
-                  echo "VERSION_DMG=TTPOS-Go-V${VERSION}.dmg" >> $GITHUB_ENV
+                  L_NAME="TTPOS-Assistant-latest.dmg"
+                  V_DMG="TTPOS-Assistant-${VERSION}.dmg"
                   ;;
               "kds")
-                  echo "LATEST_NAME=TTPOS-Kitchen-latest.dmg" >> $GITHUB_ENV
-                  echo "VERSION_DMG=TTPOS-Kitchen-V${VERSION}.dmg" >> $GITHUB_ENV
+                  L_NAME="TTPOS-Kitchen-latest.dmg"
+                  V_DMG="TTPOS-Kitchen-${VERSION}.dmg"
                   ;;
               "tablet")
-                  echo "LATEST_NAME=TTPOS-Menu-latest.dmg" >> $GITHUB_ENV
-                  echo "VERSION_DMG=TTPOS-Shop-V${VERSION}.dmg" >> $GITHUB_ENV
+                  L_NAME="TTPOS-Menu-latest.dmg"
+                  V_DMG="TTPOS-Menu-${VERSION}.dmg"
                   ;;
               "shop")
-                  echo "LATEST_NAME=TTPOS-Shop-latest.dmg" >> $GITHUB_ENV
-                  echo "VERSION_DMG=${{ env.Shop_name }}" >> $GITHUB_ENV
+                  L_NAME="TTPOS-Shop-latest.dmg"
+                  V_DMG="TTPOS-Shop-${VERSION}.dmg"
+                  ;;
+              *)
+                  L_NAME="TTPOS-${PACKAGE_NAME}-latest.dmg"
+                  V_DMG="TTPOS-${PACKAGE_NAME}-${VERSION}.dmg"
                   ;;
           esac
+          echo "LATEST_NAME=${L_NAME}" >> $GITHUB_ENV
+          echo "VERSION_DMG=${V_DMG}" >> $GITHUB_ENV
           echo "解析到版本号: $VERSION"
 
       - name: 获取签名身份
@@ -767,14 +774,19 @@ jobs:
           username: ${{ secrets.SCP_S_USER }}
           privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
           command: |
-            echo "上传 $PACKAGE_NAME DMG 到服务器..."
-            scp ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}${{ env.VERSION_DMG }}  "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
-
-            # 2. 在最终服务器创建软链
-            if [ -n "${{ env.LATEST_NAME }}" ] && [ -n "${{ env.VERSION_DMG }}" ]; then
-                ssh -o StrictHostKeyChecking=no ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }} "cd ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }} && ln -sf ${{ env.VERSION_DMG }} ${{ env.LATEST_NAME }}"
-                echo "Created symlink: ${{ env.LATEST_NAME }} -> ${{ env.VERSION_DMG }}"
-            fi
+            # 这里的命令在中转服务器执行
+            S_PATH="${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}"
+            D_PATH="${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
+            V_DMG="${{ env.VERSION_DMG }}"
+            L_NAME="${{ env.LATEST_NAME }}"
+            D_USER="${{ secrets.SCP_D_USER }}"
+            D_HOST="${{ secrets.SCP_D_HOST }}"
+            
+            echo "传输 ${V_DMG} 到最终服务器..."
+            scp -o StrictHostKeyChecking=no "${S_PATH}${V_DMG}" "${D_USER}@${D_HOST}:${D_PATH}"
+            
+            echo "在最终服务器创建软链..."
+            ssh -o StrictHostKeyChecking=no "${D_USER}@${D_HOST}" "cd ${D_PATH} && ln -sf ${V_DMG} ${L_NAME}" 
           sourceFiles: |
             ${{ env.DMG_PATH }}
           targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
