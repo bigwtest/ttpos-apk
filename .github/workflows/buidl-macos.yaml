@@ -775,22 +775,16 @@ jobs:
           privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
           command: |
             # 这里的命令在中转服务器执行
-            S_PATH="${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}"
-            D_PATH="${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
-            V_DMG="${{ env.VERSION_DMG }}"
-            L_NAME="${{ env.LATEST_NAME }}"
-            D_USER="${{ secrets.SCP_D_USER }}"
-            D_HOST="${{ secrets.SCP_D_HOST }}"
-            
-            echo "传输 ${V_DMG} 到最终服务器..."
-            scp -o StrictHostKeyChecking=no "${S_PATH}${V_DMG}" "${D_USER}@${D_HOST}:${D_PATH}"
+            echo "传输 ${{ env.VERSION_DMG }} 到最终服务器..."
+            scp -o StrictHostKeyChecking=no "${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}${{ env.VERSION_DMG }}" "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
             
             echo "在最终服务器创建软链..."
-            ssh -o StrictHostKeyChecking=no "${D_USER}@${D_HOST}" "cd ${D_PATH} && ln -sf ${V_DMG} ${L_NAME}" 
+            ssh -o StrictHostKeyChecking=no "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}" "cd ${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }} && ln -sf ${{ env.VERSION_DMG }} ${{ env.LATEST_NAME }}" 
           sourceFiles: |
             ${{ env.DMG_PATH }}
           targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
           scpFirst: true
+
 
   build-all:
     if: github.event.inputs.build_type == 'all'
