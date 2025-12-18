@@ -1,135 +1,597 @@
-name: Build Android APK
+name: Build Windows New
+
+env:
+  output_path: releases
+  assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Assistant/' || 'dc_apk/TTPOS/Test/Windows/Assistant/' }}
+  kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Kitchen/' || 'dc_apk/TTPOS/Test/Windows/Kitchen/' }}
+  tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Prod/Menu/' || 'dc_apk/TTPOS/Test/Windows/Menu/' }}
+  pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Cashier/' || 'dc_apk/TTPOS/Test/Windows/Cashier/' }}
+  shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Shop/' || 'dc_apk/TTPOS/Test/Windows/Shop/' }}
+  # 中转服务器路径（根据包名和分支自动选择）
+  scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/pos/' || '/hitosea/ttpos-windows/Test/pos/' }}
+  scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/kds/' || '/hitosea/ttpos-windows/Test/kds/' }}
+  scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/assistant/' || '/hitosea/ttpos-windows/Test/assistant/' }}
+  scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/tablet/' || '/hitosea/ttpos-windows/Test/tablet/' }}
+  scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-windows/Prod/shop/' || '/hitosea/ttpos-windows/Test/shop/' }}
+  # 目标服务器路径
+  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Cashier/' || '/root/web/web/restant/out/downloads/Windows/Test/Cashier/' }}
+  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Kitchen/' || '/root/web/web/restant/out/downloads/Windows/Test/Kitchen/' }}
+  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Assistant/' || '/root/web/web/restant/out/downloads/Windows/Test/Assistant/' }}
+  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Menu/' || '/root/web/web/restant/out/downloads/Windows/Test/Menu/' }}
+  scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Windows/Shop/' || '/root/web/web/restant/out/downloads/Windows/Test/Shop/' }}
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      repository:
+        description: '目标仓库地址 (格式: owner/repo)'
+        required: true
+        default: 'innet8/ttpos-flutter'
+        type: string
+      branch:
+        description: "选择构建分支"
+        required: true
+        type: choice
+        options:
+          - "new-test"
+          - "release"
+          - "xq_tts"
+      env:
+        description: "选择构建环境"
+        required: true
+        type: choice
+        options:
+          - "prod"
+          - "test"
+          - "dev"
+      build_type:
+        description: "选择构建类型"
+        required: true
+        type: choice
+        options:
+          - "all"
+          - "single"
+        default: "single"
+      package_name:
+        description: "选择要构建的应用端（当构建类型为 single 时必选）"
+        required: true
+        type: choice
+        options:
+          - pos
+          - kds
+          - assistant
+          - tablet
+          - shop
+        default: "pos"
+      base_url:
+        description: "选择API基础URL"
+        required: true
+        type: choice
+        options:
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "选择WebSocket基础URL"
+        required: true
+        type: choice
+        options:
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
+      scp:
+        description: "是否启用SCP传输"
+        required: true
+        default: "on"
+        type: choice
+        options:
+          - "on"
+          - "off"
 
 jobs:
-  build:
-    runs-on: windows-latest
-    
+  build-single:
+    if: github.event.inputs.build_type == 'single'
+    runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v3
-      
+      - name: 显示构建信息
+        run: |
+          Write-Host "========================================="
+          Write-Host "单端构建信息"
+          Write-Host "========================================="
+          Write-Host "应用端: ${{ github.event.inputs.package_name }}"
+          Write-Host "分支: ${{ github.event.inputs.branch }}"
+          Write-Host "环境: ${{ github.event.inputs.env }}"
+          Write-Host "构建类型: ${{ github.event.inputs.build_type }}"
+          Write-Host "API URL: ${{ github.event.inputs.base_url }}"
+          Write-Host "WebSocket URL: ${{ github.event.inputs.base_ws_url }}"
+          Write-Host "SCP传输: ${{ github.event.inputs.scp }}"
+          Write-Host "========================================="
+
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.27.3'
           channel: 'stable'
-          
-      - name: Install dependencies
+          cache: true
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart --version
+          dart pub global activate melos
+
+      - name: Melos Init
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+
+      - name: 生成环境变量文件
+        run: |
+          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
+          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
+          (Get-Content apps/${{ github.event.inputs.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ github.event.inputs.package_name }}/.env.production.local
+          (Get-Content apps/${{ github.event.inputs.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ github.event.inputs.package_name }}/.env.production.local
+          Get-Content apps/${{ github.event.inputs.package_name }}/.env.production.local
+
+      - name: 设置 SENTRY_DSN（仅 release 分支）
+        if: github.event.inputs.branch == 'release'
         shell: pwsh
         run: |
-          flutter pub get
-          flutter pub global activate melos
-          melos bootstrap
-          
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          
-      - name: Build APKs
-        shell: pwsh
-        run: |
-          # 检查并显示 Java 环境
-          Write-Host "JAVA_HOME: $env:JAVA_HOME"
-          Write-Host "Java version:"
-          java -version
-          
-          # 设置 Gradle 属性
-          $env:GRADLE_OPTS = "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8"
-          
-          # 定义要构建的应用列表
-          $apps = @("pos", "assistant", "tablet", "kds")
-          
-          foreach ($app in $apps) {
-            Write-Host "正在构建 $app 应用..."
-            
-            # 切换到应用目录
-            Set-Location "apps/$app"
-            
-            # 获取版本号
-            $version = (Get-Content pubspec.yaml | Select-String -Pattern "version:").ToString().Split(":")[1].Trim()
-            Write-Host "当前应用 $app 的版本号: $version"
-            
-            # 设置环境变量
-            $env:MELOS_PACKAGE_NAME = $app
-            $env:MELOS_PACKAGE_VERSION = $version
-            
-            # 清理旧的构建文件
-            if (Test-Path "build") {
-              Remove-Item -Path "build" -Recurse -Force
-            }
-            
-            # 构建 APK
-            flutter clean
-            flutter pub get
-            flutter build apk --release
-            
-            # 创建发布目录
-            New-Item -Path "../../releases/$app/$version" -ItemType Directory -Force
-            
-            # 复制 APK 到发布目录
-            $app_name = switch ($app) {
-              "pos" { "TTPOS" }
-              "kds" { "TTPOS-Kitchen" }
-              "assistant" { "TTPOS-Go" }
-              "tablet" { "TTPOS-Menu" }
-              default { $app }
-            }
-            
-            $apkPath = "build/app/outputs/flutter-apk/app-release.apk"
-            if (Test-Path $apkPath) {
-              Copy-Item -Path $apkPath -Destination "../../releases/$app/$version/$app_name-$version.apk"
-            } else {
-              Write-Error "APK 文件未找到: $apkPath"
-              exit 1
-            }
-            
-            # 返回项目根目录
-            Set-Location "../.."
+          $envPath = "apps/${{ github.event.inputs.package_name }}/.env.production.local"
+          $dsn = switch ("${{ github.event.inputs.package_name }}") {
+            "assistant" { "${{ secrets.SENTRYDSN_ASSISTANT }}" }
+            "kds" { "${{ secrets.SENTRYDSN_KDS }}" }
+            "pos" { "${{ secrets.SENTRYDSN_POS }}" }
+            "tablet" { "${{ secrets.SENTRYDSN_TABLET }}" }
+            "shop" { "${{ secrets.SENTRYDSN_SHOP }}" }
+            default { "" }
+          }
+          if ($dsn -ne "") {
+            (Get-Content $envPath) -replace '^SENTRY_DSN=.*', "SENTRY_DSN=$dsn" | Set-Content $envPath
+            Write-Host "已设置 SENTRY_DSN=$dsn 到 $envPath"
+          } else {
+            Write-Host "未设置 SENTRY_DSN，包名未匹配。"
           }
           
-      # - name: Create Release ZIP
-      #   shell: pwsh
-      #   run: |
-      #     # 创建临时目录
-      #     $tempDir = Join-Path $PWD "temp_for_zip"
-      #     if (Test-Path $tempDir) {
-      #       Remove-Item -Path $tempDir -Recurse -Force
-      #     }
-      #     New-Item -Path $tempDir -ItemType Directory -Force
+      - name: 设置环境变量
+        run: |
+          $env:MELOS_PACKAGE_NAME = "${{ github.event.inputs.package_name }}"
+          $version = (Get-Content apps/${{ github.event.inputs.package_name }}/pubspec.yaml | Select-String 'version:' | ForEach-Object { $_.Line.Split(':')[1].Trim() }).Split('+')[0]
+          $env:MELOS_PACKAGE_VERSION = $version
+          echo "MELOS_PACKAGE_NAME=$env:MELOS_PACKAGE_NAME" >> $env:GITHUB_ENV
+          echo "MELOS_PACKAGE_VERSION=$env:MELOS_PACKAGE_VERSION" >> $env:GITHUB_ENV
+
+
+      - name: 构建 Windows 安装包
+        run: |
+          dart run ./scripts/build_win_innosetup.dart --env=${{ github.event.inputs.env }} --package=${{ github.event.inputs.package_name }}
+
+      - name: 检查构建产物
+        run: |
+          $exeName = switch ("${{ github.event.inputs.package_name }}") {
+            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ github.event.inputs.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          }
+          $exePath = ".\releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "未找到构建产物: $exePath"
+            exit 1
+          }
+          Write-Host "构建产物存在: $exePath"
+
+      - name: Setup SSH Key
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          # 创建 .ssh 目录
+          $sshDir = "$env:USERPROFILE\.ssh"
+          if (-not (Test-Path $sshDir)) {
+            New-Item -ItemType Directory -Path $sshDir -Force
+          }
           
-      #     # 复制所有 APK 到临时目录
-      #     foreach ($app in @("pos", "assistant", "tablet", "kds")) {
-      #       $version = (Get-Content "apps/$app/pubspec.yaml" | Select-String -Pattern "version:").ToString().Split(":")[1].Trim()
-      #       $app_name = switch ($app) {
-      #         "pos" { "TTPOS" }
-      #         "kds" { "TTPOS-Kitchen" }
-      #         "assistant" { "TTPOS-Go" }
-      #         "tablet" { "TTPOS-Menu" }
-      #         default { $app }
-      #       }
-            
-      #       Copy-Item -Path "releases/$app/$version/$app_name-$version.apk" -Destination $tempDir
-      #     }
+          # 创建私钥文件
+          $privateKeyPath = "$sshDir\id_rsa"
+          "${{ secrets.SCP_S_RIVATEKEY }}" | Out-File -FilePath $privateKeyPath -Encoding UTF8
           
-      #     # 创建 ZIP 文件
-      #     Compress-Archive -Path "$tempDir\*" -DestinationPath "android-$version.zip" -Force
+          # 设置私钥文件权限（Windows）
+          try {
+            # 移除继承权限
+            icacls $privateKeyPath /inheritance:r /c
+            # 只给当前用户读取权限
+            icacls $privateKeyPath /grant "${env:USERNAME}:R" /c
+            # 移除其他用户的权限
+            icacls $privateKeyPath /remove "Everyone" /c 2>$null
+            icacls $privateKeyPath /remove "Users" /c 2>$null
+            icacls $privateKeyPath /remove "Authenticated Users" /c 2>$null
+            Write-Host "私钥文件权限设置成功"
+          } catch {
+            Write-Host "权限设置失败，但继续执行: $_"
+          }
           
-      #     # 清理临时目录
-      #     Remove-Item -Path $tempDir -Recurse -Force
+          # 验证文件存在
+          if (Test-Path $privateKeyPath) {
+            $fileSize = (Get-Item $privateKeyPath).Length
+            Write-Host "SSH 私钥已设置到: $privateKeyPath (大小: $fileSize 字节)"
+          } else {
+            Write-Error "私钥文件创建失败"
+            exit 1
+          }
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          $exeName = switch ("${{ github.event.inputs.package_name }}") {
+            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ github.event.inputs.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          }
+          $exePath = ".\releases\${{ github.event.inputs.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Host "警告：未找到 $exePath，跳过传输。"
+            exit 0
+          }
+
+          # 私钥文件路径
+          $privateKeyPath = "$env:USERPROFILE\.ssh\id_rsa"
           
-      # - name: Upload Release Assets
-      #   uses: softprops/action-gh-release@v1
-      #   if: startsWith(github.ref, 'refs/tags/')
-      #   with:
-      #     files: |
-      #       android-*.zip
-      #       releases/**/*.apk
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          # 使用环境变量中的路径
+          $scpSourcePath = "${{ env[format('scp_s_{0}', github.event.inputs.package_name)] }}"
+          $scpTargetPath = "${{ env[format('scp_d_{0}', github.event.inputs.package_name)] }}"
+          $targetServer = "${{ secrets.SCP_D_HOST }}"
+          $forwardIp = "${{ secrets.SCP_S_HOST }}"
+          $forwardUser = "${{ secrets.SCP_S_USER }}"
+          $targetUser = "${{ secrets.SCP_D_USER }}"
+          
+          Write-Host "开始传输 ${{ github.event.inputs.package_name }} 应用..."
+          Write-Host "中转路径: $scpSourcePath"
+          Write-Host "目标路径: $scpTargetPath"
+          Write-Host "使用私钥: $privateKeyPath"
+
+          # SSH 选项
+          $sshOptions = @(
+            "-i", $privateKeyPath,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null"
+          )
+
+          # SCP 选项：禁用主机密钥检查，启用详细输出
+          $scpOptions = @(
+            "-i", $privateKeyPath,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-v"
+          )
+
+          # 1. 先在中转服务器上创建目录
+          Write-Host "正在中转服务器上创建目录: $scpSourcePath ..."
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "mkdir -p $scpSourcePath"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "在中转服务器上创建目录失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+
+          # 2. 传输文件到中转服务器
+          Write-Host "正在传输 $exePath 到中转服务器 ${forwardUser}@${forwardIp}:$scpSourcePath ..."
+          & scp @scpOptions "$exePath" "${forwardUser}@${forwardIp}:$scpSourcePath"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "传输到中转服务器失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+
+          # 3. 再由中转服务器传到目标服务器
+          Write-Host "正在从中转服务器 ${forwardIp} 传输 $exeName 到目标服务器 ${targetUser}@${targetServer}:$scpTargetPath ..."
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
+            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
+            case \"${{ github.event.inputs.package_name }}\" in
+                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
+                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
+                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
+                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
+                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
+                *) LATEST_NAME=\"TTPOS-${{ github.event.inputs.package_name }}-latest.exe\" ;;
+            esac
+            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName `$LATEST_NAME\"
+          "
+            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
+            case \"${{ github.event.inputs.package_name }}\" in
+                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
+                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
+                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
+                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
+                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
+                *) LATEST_NAME=\"TTPOS-${{ github.event.inputs.package_name }}-latest.exe\" ;;
+            esac
+            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName \$LATEST_NAME\"
+          "
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "传输到目标服务器失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+
+          Write-Host "${{ github.event.inputs.package_name }} 传输完成！"
+
+      - name: Upload to Google Cloud Storage
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
+
+      - id: "upload-files"
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: releases/${{ github.event.inputs.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}
+          destination: ${{ env[format('{0}_path', github.event.inputs.package_name)] }}
+          parent: false         
+
+  build-all:
+    if: github.event.inputs.build_type == 'all'
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        package_name: [pos, kds, assistant, tablet, shop]
+      fail-fast: false
+    steps:
+      - name: 显示构建信息
+        run: |
+          Write-Host "========================================="
+          Write-Host "全端构建信息"
+          Write-Host "========================================="
+          Write-Host "应用端: ${{ matrix.package_name }}"
+          Write-Host "分支: ${{ github.event.inputs.branch }}"
+          Write-Host "环境: ${{ github.event.inputs.env }}"
+          Write-Host "构建类型: ${{ github.event.inputs.build_type }}"
+          Write-Host "API URL: ${{ github.event.inputs.base_url }}"
+          Write-Host "WebSocket URL: ${{ github.event.inputs.base_ws_url }}"
+          Write-Host "SCP传输: ${{ github.event.inputs.scp }}"
+          Write-Host "========================================="
+
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.3'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart --version
+          dart pub global activate melos
+
+      - name: Melos Init
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+
+      - name: 生成环境变量文件
+        run: |
+          $env:API_BASE_URL = "${{ github.event.inputs.base_url }}"
+          $env:WS_BASE_URL = "${{ github.event.inputs.base_ws_url }}"
+          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^API_BASE_URL=.*', "API_BASE_URL=$env:API_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
+          (Get-Content apps/${{ matrix.package_name }}/.env.production.local) -replace '^WS_BASE_URL=.*', "WS_BASE_URL=$env:WS_BASE_URL" | Set-Content apps/${{ matrix.package_name }}/.env.production.local
+          Get-Content apps/${{ matrix.package_name }}/.env.production.local
+
+      - name: 设置 SENTRY_DSN（仅 release 分支）
+        if: github.event.inputs.branch == 'release'
+        shell: pwsh
+        run: |
+          $envPath = "apps/${{ matrix.package_name }}/.env.production.local"
+          $dsn = switch ("${{ matrix.package_name }}") {
+            "assistant" { "${{ secrets.SENTRYDSN_ASSISTANT }}" }
+            "kds" { "${{ secrets.SENTRYDSN_KDS }}" }
+            "pos" { "${{ secrets.SENTRYDSN_POS }}" }
+            "tablet" { "${{ secrets.SENTRYDSN_TABLET }}" }
+            "shop" { "${{ secrets.SENTRYDSN_SHOP }}" }
+            default { "" }
+          }
+          if ($dsn -ne "") {
+            (Get-Content $envPath) -replace '^SENTRY_DSN=.*', "SENTRY_DSN=$dsn" | Set-Content $envPath
+            Write-Host "已设置 SENTRY_DSN=$dsn 到 $envPath"
+          } else {
+            Write-Host "未设置 SENTRY_DSN，包名未匹配。"
+          }
+          
+      - name: 设置环境变量
+        run: |
+          $env:MELOS_PACKAGE_NAME = "${{ matrix.package_name }}"
+          $version = (Get-Content apps/${{ matrix.package_name }}/pubspec.yaml | Select-String 'version:' | ForEach-Object { $_.Line.Split(':')[1].Trim() }).Split('+')[0]
+          $env:MELOS_PACKAGE_VERSION = $version
+          echo "MELOS_PACKAGE_NAME=$env:MELOS_PACKAGE_NAME" >> $env:GITHUB_ENV
+          echo "MELOS_PACKAGE_VERSION=$env:MELOS_PACKAGE_VERSION" >> $env:GITHUB_ENV
+
+
+      - name: 构建 Windows 安装包
+        run: |
+          dart run ./scripts/build_win_innosetup.dart --env=${{ github.event.inputs.env }} --package=${{ matrix.package_name }}
+
+      - name: 检查构建产物
+        run: |
+          $exeName = switch ("${{ matrix.package_name }}") {
+            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ matrix.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          }
+          $exePath = ".\releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "未找到构建产物: $exePath"
+            exit 1
+          }
+          Write-Host "构建产物存在: $exePath"
+
+      - name: Setup SSH Key
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          # 创建 .ssh 目录
+          $sshDir = "$env:USERPROFILE\.ssh"
+          if (-not (Test-Path $sshDir)) {
+            New-Item -ItemType Directory -Path $sshDir -Force
+          }
+          
+          # 创建私钥文件
+          $privateKeyPath = "$sshDir\id_rsa"
+          "${{ secrets.SCP_S_RIVATEKEY }}" | Out-File -FilePath $privateKeyPath -Encoding UTF8
+          
+          # 设置私钥文件权限（Windows）
+          try {
+            # 移除继承权限
+            icacls $privateKeyPath /inheritance:r /c
+            # 只给当前用户读取权限
+            icacls $privateKeyPath /grant "${env:USERNAME}:R" /c
+            # 移除其他用户的权限
+            icacls $privateKeyPath /remove "Everyone" /c 2>$null
+            icacls $privateKeyPath /remove "Users" /c 2>$null
+            icacls $privateKeyPath /remove "Authenticated Users" /c 2>$null
+            Write-Host "私钥文件权限设置成功"
+          } catch {
+            Write-Host "权限设置失败，但继续执行: $_"
+          }
+          
+          # 验证文件存在
+          if (Test-Path $privateKeyPath) {
+            $fileSize = (Get-Item $privateKeyPath).Length
+            Write-Host "SSH 私钥已设置到: $privateKeyPath (大小: $fileSize 字节)"
+          } else {
+            Write-Error "私钥文件创建失败"
+            exit 1
+          }
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        shell: pwsh
+        run: |
+          $exeName = switch ("${{ matrix.package_name }}") {
+            "pos" { "TTPOS-$env:MELOS_PACKAGE_VERSION.exe" }
+            "kds" { "TTPOS-Kitchen-$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-$env:MELOS_PACKAGE_VERSION.exe" }
+            "tablet" { "TTPOS-Menu-$env:MELOS_PACKAGE_VERSION.exe" }
+            "shop" { "TTPOS-Shop-$env:MELOS_PACKAGE_VERSION.exe" }
+            default { "${{ matrix.package_name }}-$env:MELOS_PACKAGE_VERSION.exe" }
+          }
+          $exePath = ".\releases\${{ matrix.package_name }}\$env:MELOS_PACKAGE_VERSION\$exeName"
+          if (-not (Test-Path $exePath)) {
+            Write-Host "警告：未找到 $exePath，跳过传输。"
+            exit 0
+          }
+
+          # 私钥文件路径
+          $privateKeyPath = "$env:USERPROFILE\.ssh\id_rsa"
+          
+          # 使用环境变量中的路径
+          $scpSourcePath = "${{ env[format('scp_s_{0}', matrix.package_name)] }}"
+          $scpTargetPath = "${{ env[format('scp_d_{0}', matrix.package_name)] }}"
+          $targetServer = "${{ secrets.SCP_D_HOST }}"
+          $forwardIp = "${{ secrets.SCP_S_HOST }}"
+          $forwardUser = "${{ secrets.SCP_S_USER }}"
+          $targetUser = "${{ secrets.SCP_D_USER }}"
+          
+          Write-Host "开始传输 ${{ matrix.package_name }} 应用..."
+          Write-Host "中转路径: $scpSourcePath"
+          Write-Host "目标路径: $scpTargetPath"
+          Write-Host "使用私钥: $privateKeyPath"
+
+          # SSH 选项
+          $sshOptions = @(
+            "-i", $privateKeyPath,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null"
+          )
+
+          # SCP 选项：禁用主机密钥检查，启用详细输出
+          $scpOptions = @(
+            "-i", $privateKeyPath,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-v"
+          )
+
+          # 1. 先在中转服务器上创建目录
+          Write-Host "正在中转服务器上创建目录: $scpSourcePath ..."
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "mkdir -p $scpSourcePath"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "在中转服务器上创建目录失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
+            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
+            case \"${{ matrix.package_name }}\" in
+                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
+                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
+                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
+                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
+                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
+                *) LATEST_NAME=\"TTPOS-${{ matrix.package_name }}-latest.exe\" ;;
+            esac
+            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName `$LATEST_NAME\"
+          "
+          # 2. 传输文件到中转服务器
+          Write-Host "正在传输 $exePath 到中转服务器 ${forwardUser}@${forwardIp}:$scpSourcePath ..."
+          & scp @scpOptions "$exePath" "${forwardUser}@${forwardIp}:$scpSourcePath"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "传输到中转服务器失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+
+          # 3. 再由中转服务器传到目标服务器
+          Write-Host "正在从中转服务器 ${forwardIp} 传输 $exeName 到目标服务器 ${targetUser}@${targetServer}:$scpTargetPath ..."
+          & ssh @sshOptions "${forwardUser}@${forwardIp}" "
+            scp -o StrictHostKeyChecking=no $scpSourcePath$exeName ${targetUser}@${targetServer}:$scpTargetPath;
+            case \"${{ matrix.package_name }}\" in
+                \"pos\") LATEST_NAME=\"TTPOS-Cashier-latest.exe\" ;;
+                \"assistant\") LATEST_NAME=\"TTPOS-Assistant-latest.exe\" ;;
+                \"kds\") LATEST_NAME=\"TTPOS-Kitchen-latest.exe\" ;;
+                \"tablet\") LATEST_NAME=\"TTPOS-Menu-latest.exe\" ;;
+                \"shop\") LATEST_NAME=\"TTPOS-Shop-latest.exe\" ;;
+                *) LATEST_NAME=\"TTPOS-${{ matrix.package_name }}-latest.exe\" ;;
+            esac
+            ssh -o StrictHostKeyChecking=no ${targetUser}@${targetServer} \"cd $scpTargetPath && ln -sf $exeName \$LATEST_NAME\"
+          "
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "传输到目标服务器失败！退出代码: $LASTEXITCODE"
+            exit 1
+          }
+
+          Write-Host "${{ matrix.package_name }} 传输完成！"
+
+      - name: Upload to Google Cloud Storage
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
+
+      - id: "upload-files"
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: releases/${{ matrix.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}
+          destination: ${{ env[format('{0}_path', matrix.package_name)] }}
+          parent: false
+          
