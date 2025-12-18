@@ -115,7 +115,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.TOKEN }}
 
-      - name: Setup Flutter
+     - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.27.3'
@@ -180,9 +180,9 @@ jobs:
       - name: 检查构建产物
         run: |
           $exeName = switch ("${{ github.event.inputs.package_name }}") {
-            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "pos" { "TTPOS-V$env:MELOS_PACKAGE_VERSION.exe" }
             "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-V$env:MELOS_PACKAGE_VERSION.exe" }
             "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
             "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
             default { "${{ github.event.inputs.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
@@ -240,18 +240,18 @@ jobs:
           $version = "${{ env.MELOS_PACKAGE_VERSION }}"
           
           $exeName = switch ($packageName) {
-            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "pos" { "TTPOS-V$version.exe" }
             "kds" { "TTPOS-Kitchen-V$version.exe" }
-            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "assistant" { "TTPOS-Go-V$version.exe" }
             "tablet" { "TTPOS-Menu-V$version.exe" }
             "shop" { "TTPOS-Shop-V$version.exe" }
             default { "$packageName-V$version.exe" }
           }
           
           $latestName = switch ($packageName) {
-            "pos" { "TTPOS-Cashier-latest.exe" }
+            "pos" { "TTPOS-latest.exe" }
             "kds" { "TTPOS-Kitchen-latest.exe" }
-            "assistant" { "TTPOS-Assistant-latest.exe" }
+            "assistant" { "TTPOS-Go-latest.exe" }
             "tablet" { "TTPOS-Menu-latest.exe" }
             "shop" { "TTPOS-Shop-latest.exe" }
             default { "TTPOS-$packageName-latest.exe" }
@@ -389,9 +389,9 @@ jobs:
       - name: 检查构建产物
         run: |
           $exeName = switch ("${{ matrix.package_name }}") {
-            "pos" { "TTPOS-Cashier-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "pos" { "TTPOS-V$env:MELOS_PACKAGE_VERSION.exe" }
             "kds" { "TTPOS-Kitchen-V$env:MELOS_PACKAGE_VERSION.exe" }
-            "assistant" { "TTPOS-Assistant-V$env:MELOS_PACKAGE_VERSION.exe" }
+            "assistant" { "TTPOS-Go-V$env:MELOS_PACKAGE_VERSION.exe" }
             "tablet" { "TTPOS-Menu-V$env:MELOS_PACKAGE_VERSION.exe" }
             "shop" { "TTPOS-Shop-V$env:MELOS_PACKAGE_VERSION.exe" }
             default { "${{ matrix.package_name }}-V$env:MELOS_PACKAGE_VERSION.exe" }
@@ -449,18 +449,18 @@ jobs:
           $version = "${{ env.MELOS_PACKAGE_VERSION }}"
           
           $exeName = switch ($packageName) {
-            "pos" { "TTPOS-Cashier-V$version.exe" }
+            "pos" { "TTPOS-V$version.exe" }
             "kds" { "TTPOS-Kitchen-V$version.exe" }
-            "assistant" { "TTPOS-Assistant-V$version.exe" }
+            "assistant" { "TTPOS-Go-V$version.exe" }
             "tablet" { "TTPOS-Menu-V$version.exe" }
             "shop" { "TTPOS-Shop-V$version.exe" }
             default { "$packageName-V$version.exe" }
           }
           
           $latestName = switch ($packageName) {
-            "pos" { "TTPOS-Cashier-latest.exe" }
+            "pos" { "TTPOS-latest.exe" }
             "kds" { "TTPOS-Kitchen-latest.exe" }
-            "assistant" { "TTPOS-Assistant-latest.exe" }
+            "assistant" { "TTPOS-Go-latest.exe" }
             "tablet" { "TTPOS-Menu-latest.exe" }
             "shop" { "TTPOS-Shop-latest.exe" }
             default { "TTPOS-$packageName-latest.exe" }
