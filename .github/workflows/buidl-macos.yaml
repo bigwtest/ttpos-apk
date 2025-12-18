@@ -775,7 +775,7 @@ jobs:
           privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
           command: |
             echo "传输 ${{ env.VERSION_DMG }} 到最终服务器..."
-            scp scp ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}${{ env.VERSION_DMG }} "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
+            scp ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}${{ env.VERSION_DMG }} "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }}"
           sourceFiles: |
             ${{ env.DMG_PATH }}
           targetDir: ${{ env[format('scp_s_{0}', env.PACKAGE_NAME)] }}
