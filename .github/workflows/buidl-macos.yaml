@@ -362,34 +362,24 @@ jobs:
           # 根据 matrix 判断包名和对应的软链名
             case "${{ env.PACKAGE_NAME }}" in
                 "pos")
-                    LATEST_NAME="TTPOS-latest.dmg"
-                    VERSION_DMG="${{ env.Cashier_name }}"
-                    echo ${LATEST_NAME} >> $GITHUB_ENV
-                    echo ${VERSION_DMG} >> $GITHUB_ENV
+                    echo "LATEST_NAME=TTPOS-latest.dmg" >> $GITHUB_ENV
+                    echo "VERSION_DMG=${{ env.Cashier_name }}" >> $GITHUB_ENV
                     ;;
                 "assistant")
-                    LATEST_NAME="TTPOS-Go-latest.dmg"
-                    VERSION_DMG="${{ env.Assistant_name }}"
-                    echo ${LATEST_NAME} >> $GITHUB_ENV
-                    echo ${VERSION_DMG} >> $GITHUB_ENV
+                    echo "LATEST_NAME=TTPOS-Go-latest.dmg" >> $GITHUB_ENV
+                    echo "VERSION_DMG=${{ env.Assistant_name }}" >> $GITHUB_ENV
                     ;;
                 "kds")
-                    LATEST_NAME="TTPOS-Kitchen-latest.dmg"
-                    VERSION_DMG="${{ env.Kitchen_name }}"
-                    echo ${LATEST_NAME} >> $GITHUB_ENV
-                    echo ${VERSION_DMG} >> $GITHUB_ENV
+                    echo "LATEST_NAME=TTPOS-Kitchen-latest.dmg" >> $GITHUB_ENV
+                    echo "VERSION_DMG=${{ env.Kitchen_name }}" >> $GITHUB_ENV
                     ;;
                 "tablet")
-                    LATEST_NAME="TTPOS-Menu-latest.dmg"
-                    VERSION_DMG="${{ env.Menu_name }}"
-                    echo ${LATEST_NAME} >> $GITHUB_ENV
-                    echo ${VERSION_DMG} >> $GITHUB_ENV
+                    echo "LATEST_NAME=TTPOS-Menu-latest.dmg" >> $GITHUB_ENV
+                    echo "VERSION_DMG=${{ env.Menu_name }}" >> $GITHUB_ENV
                     ;;
                 "shop")
-                    LATEST_NAME="TTPOS-Shop-latest.dmg"
-                    VERSION_DMG="${{ env.Shop_name }}"
-                    echo ${LATEST_NAME} >> $GITHUB_ENV
-                    echo ${VERSION_DMG} >> $GITHUB_ENV
+                    echo "LATEST_NAME=TTPOS-Shop-latest.dmg" >> $GITHUB_ENV
+                    echo "VERSION_DMG=${{ env.Shop_name }}" >> $GITHUB_ENV
                     ;;
             esac
           echo "解析到版本号: $VERSION"
@@ -828,3 +818,4 @@ jobs:
       scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
       scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
     steps: *mac_steps
+
