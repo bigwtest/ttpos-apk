@@ -23,12 +23,12 @@ env:
   scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
   scp_s_qds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/qds/' || '/hitosea/ttpos-apk/Test/qds/' }}
   #最终下载路径：www.ttpos.com/downloads
-  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Assistant/' || '/root/web/web/restant/out/downloads/Test/Assistant/' }}
-  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kitchen/' || '/root/web/web/restant/out/downloads/Test/Kitchen/' }}
-  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Menu/' || '/root/web/web/restant/out/downloads/Test/Menu/' }}
-  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Cashier/' || '/root/web/web/restant/out/downloads/Test/Cashier/' }}
-  scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Shop/' || '/root/web/web/restant/out/downloads/Test/Shop/' }}
-  scp_d_qds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Qds/' || '/root/web/web/restant/out/downloads/Test/Qds/' }}
+  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Assistant/' || '/root/web/web/restant/out/downloads/Test/Assistant/' }}
+  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Kitchen/' || '/root/web/web/restant/out/downloads/Test/Kitchen/' }}
+  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Menu/' || '/root/web/web/restant/out/downloads/Test/Menu/' }}
+  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Cashier/' || '/root/web/web/restant/out/downloads/Test/Cashier/' }}
+  scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Shop/' || '/root/web/web/restant/out/downloads/Test/Shop/' }}
+  scp_d_qds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Test/Qds/' || '/root/web/web/restant/out/downloads/Test/Qds/' }}
 on:
   workflow_dispatch:
     inputs:
