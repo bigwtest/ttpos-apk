@@ -276,7 +276,7 @@ jobs:
           $latestName = switch ($packageName) {
             "pos" { "TTPOS-latest.exe" }
             "kds" { "TTPOS-Kitchen-latest.exe" }
-            "assistant" { "TTPOS-Go-latest.exe" }
+            "assistant" { "TTPOS-Assistant-latest.exe" }
             "tablet" { "TTPOS-Menu-latest.exe" }
             "shop" { "TTPOS-Shop-latest.exe" }
             default { "TTPOS-$packageName-latest.exe" }
@@ -346,7 +346,8 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
 
       - name: Setup Flutter
@@ -554,4 +555,6 @@ jobs:
           path: releases/${{ matrix.package_name }}/${{ env.MELOS_PACKAGE_VERSION }}
           destination: ${{ env[format('{0}_path', matrix.package_name)] }}
           parent: false
+          
+
           
