@@ -98,11 +98,11 @@ jobs:
       scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
       scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
       # 最终下载路径：www.ttpos.com/downloads
-      scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Assistant/' }}
-      scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Kitchen/' }}
-      scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Menu/' }}
-      scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Cashier/' }}
-      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Shop/' }}
+      scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Assistant/' || '/root/web/web/restant/out/downloads/MacOS/Test/Assistant/' }}
+      scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Kitchen/' || '/root/web/web/restant/out/downloads/MacOS/Test/Kitchen/' }}
+      scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Menu/' || '/root/web/web/restant/out/downloads/MacOS/Test/Menu/' }}
+      scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Cashier/' || '/root/web/web/restant/out/downloads/MacOS/Test/Cashier/' }}
+      scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/MacOS/Shop/' || '/root/web/web/restant/out/downloads/MacOS/Test/Shop/' }}
     steps: &mac_steps
       - name: 显示构建信息
         shell: bash
@@ -125,6 +125,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.TOKEN }}
 
+
       - name: 配置 App Store Connect 登录
         shell: bash
         env:
@@ -138,7 +139,6 @@ jobs:
             exit 0
           fi
           echo "LOGGED_IN_WITH_APPLE_ID=true" >> "$GITHUB_ENV"
-
       - name: 创建临时钥匙串并导入证书
         shell: bash
         env:
@@ -189,7 +189,6 @@ jobs:
           echo "MAC_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
           
           echo "证书导入完成!"
-
       - name: 安装开发描述文件
         shell: bash
         env:
@@ -202,33 +201,26 @@ jobs:
           set -e
           echo "🔧 开始安装 macOS 开发描述文件..."
           echo "当前 PACKAGE_NAME=${PACKAGE_NAME}"
-
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
-
           if [ "$PACKAGE_NAME" = "all" ]; then
             echo "🚀 构建模式为 all，开始安装所有应用的描述文件..."
             for pkg in pos assistant kds tablet shop; do
               VAR_NAME="MAC_${pkg^^}_PROFILE_BASE64"
               PROFILE_VALUE="${!VAR_NAME}"
-
               if [ -z "$PROFILE_VALUE" ]; then
                 echo "⚠️ 未配置 $VAR_NAME，跳过 $pkg"
                 continue
               fi
-
               PROFILE_PATH="$RUNNER_TEMP/mac_${pkg}_profile.provisionprofile"
               PLIST_PATH="$RUNNER_TEMP/mac_${pkg}_profile.plist"
-
               echo "$PROFILE_VALUE" | base64 --decode > "$PROFILE_PATH"
               security cms -D -i "$PROFILE_PATH" > "$PLIST_PATH"
-
               PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PLIST_PATH" 2>/dev/null || true)
               if [ -z "$PROFILE_UUID" ]; then
                 echo "❌ 无法解析 $pkg 的描述文件 UUID，可能文件损坏"
                 continue
               fi
-
               cp "$PROFILE_PATH" "$PROFILE_DIR/${PROFILE_UUID}.provisionprofile"
               echo "✅ 已安装 $pkg 的描述文件 (${PROFILE_UUID})"
             done
@@ -259,31 +251,24 @@ jobs:
                 exit 0
                 ;;
             esac
-
             if [ -z "${MAC_DEV_PROFILE_BASE64}" ]; then
               echo "未配置 ${ERR_PROFILE_VAR} 描述文件，跳过安装"
               exit 0
             fi
-
             PROFILE_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.provisionprofile"
             PLIST_PATH="$RUNNER_TEMP/mac_${PACKAGE_NAME}_profile.plist"
-
             echo "$MAC_DEV_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
             security cms -D -i "$PROFILE_PATH" > "$PLIST_PATH"
-
             PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PLIST_PATH" 2>/dev/null || true)
             if [ -z "$PROFILE_UUID" ]; then
               echo "❌ 无法解析描述文件 UUID，文件可能损坏"
               exit 1
             fi
-
             cp "$PROFILE_PATH" "$PROFILE_DIR/${PROFILE_UUID}.provisionprofile"
             echo "✅ 已安装 ${PACKAGE_NAME} 的描述文件 (${PROFILE_UUID})"
           fi
-
           echo "📁 当前已安装的描述文件："
           ls -l "$PROFILE_DIR" || echo "(未检测到任何文件)"
-
       - name: 设置默认钥匙串
         shell: bash
         run: |
@@ -293,8 +278,6 @@ jobs:
           fi
           security default-keychain -s "$KEYCHAIN_PATH"
           security unlock-keychain -p "${MAC_KEYCHAIN_PASSWORD:-github-actions-secure-2024}" "$KEYCHAIN_PATH"
-
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -316,7 +299,6 @@ jobs:
           dart --version
           dart pub global activate melos
           echo "${HOME}/.pub-cache/bin" >> "$GITHUB_PATH"
-
       - name: Melos Init
         env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
@@ -325,7 +307,6 @@ jobs:
         run: |
           melos run init
           melos bs
-
       - name: 更新环境变量文件
         shell: bash
         run: |
@@ -333,7 +314,6 @@ jobs:
           sed -i '' 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/assistant/.env.production.local apps/kds/.env.production.local apps/pos/.env.production.local apps/tablet/.env.production.local apps/shop/.env.production.local
           echo "更新后的环境文件内容:";
           cat ./apps/assistant/.env.production.local
-
       - name: 设置构建环境变量
         id: build_meta
         shell: bash
@@ -354,7 +334,6 @@ jobs:
             *) echo "不支持的包: $PACKAGE_NAME" >&2; exit 1 ;;
           esac
           echo "APP_DISPLAY_NAME=${APP_NAME}" >> "$GITHUB_ENV"
-
           # 根据 matrix 判断包名和对应的软链名
           case "${PACKAGE_NAME}" in
               "pos")
@@ -385,7 +364,6 @@ jobs:
           echo "LATEST_NAME=${L_NAME}" >> $GITHUB_ENV
           echo "VERSION_DMG=${V_DMG}" >> $GITHUB_ENV
           echo "解析到版本号: $VERSION"
-
       - name: 获取签名身份
         shell: bash
         env:
@@ -415,8 +393,6 @@ jobs:
           # 设置环境变量
           echo "MAC_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
           echo "MAC_SIGNING_TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
-
-
       - name: 构建 macOS 应用（单包）
         shell: bash
         env:
@@ -432,7 +408,6 @@ jobs:
           security unlock-keychain -p "${MAC_KEYCHAIN_PASSWORD:-github-actions}" "$KEYCHAIN_PATH"
           echo "构建单个应用: $PACKAGE_NAME"
           dart run ./scripts/build_mac.dart --env=${BUILD_ENV} --package=${PACKAGE_NAME}
-
       - name: 准备构建产物（单包）
         shell: bash
         run: |
@@ -457,7 +432,6 @@ jobs:
           echo "TARGET_DIR=$TARGET_DIR" >> "$GITHUB_ENV"
           echo "APP_PATH=$TARGET_APP" >> "$GITHUB_ENV"
           echo "已复制应用到: $TARGET_APP"
-
       - name: 调试文件系统结构
         shell: bash
         run: |
@@ -479,7 +453,6 @@ jobs:
           echo ""
           echo "=== 检查权限文件 ==="
           find "apps/${PACKAGE_NAME}/macos/Runner/" -name "*.entitlements" -type f || echo "未找到权限文件"
-
       - name: 代码签名 .app（单包）
         shell: bash
         env:
@@ -599,16 +572,108 @@ jobs:
           
           echo "签名单个应用: $PACKAGE_NAME"
           sign_app "$PACKAGE_NAME" "$APP_PATH"
-
       - name: 创建 DMG（单包）
         shell: bash
         run: |
           set -euo pipefail
-          DMG_PATH="${TARGET_DIR}/${APP_DISPLAY_NAME}-${MELOS_PACKAGE_VERSION}.dmg"
-          rm -f "$DMG_PATH"
-          hdiutil create -volname "${APP_DISPLAY_NAME}" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
-          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
-          echo "已生成 DMG: $DMG_PATH"
+          
+          # 安装 create-dmg
+          if ! command -v create-dmg &> /dev/null; then
+            echo "安装 create-dmg..."
+            brew install create-dmg
+          fi
+          
+          # 配置参数
+          package="$PACKAGE_NAME"
+          version="$MELOS_PACKAGE_VERSION"
+          
+          # 配置参数 (参考 scripts/pack_mac.dart)
+          window_size="800 400"
+          window_pos="200 120"
+          icon_size="100"
+          app_icon_pos="200 190"
+          drop_link_pos="600 185"
+          
+          case "$package" in
+            pos)
+              app_name="TTPOS"
+              vol_name="TTPOS"
+              dmg_file_prefix="TTPOS"
+              icon_path="TTPOS.app/Contents/Resources/AppIcon.icns"
+              ;;
+            assistant)
+              app_name="TTPOS Go"
+              vol_name="TTPOS Go"
+              dmg_file_prefix="TTPOS-Go"
+              icon_path="TTPOS Go.app/Contents/Resources/AppIcon.icns"
+              ;;
+            kds)
+              app_name="TTPOS Kitchen"
+              vol_name="TTPOS Kitchen"
+              dmg_file_prefix="TTPOS-Kitchen"
+              icon_path="TTPOS Kitchen.app/Contents/Resources/AppIcon.icns"
+              ;;
+            tablet)
+              app_name="TTPOS Menu"
+              vol_name="TTPOS Menu"
+              dmg_file_prefix="TTPOS-Menu"
+              icon_path="TTPOS Menu.app/Contents/Resources/AppIcon.icns"
+              ;;
+            shop)
+              app_name="TTPOS Shop"
+              vol_name="TTPOS Shop"
+              dmg_file_prefix="TTPOS-Shop"
+              icon_path="TTPOS Shop.app/Contents/Resources/AppIcon.icns"
+              ;;
+          esac
+          
+          release_dir="releases/${package}/${version}"
+          dmg_name="${dmg_file_prefix}-${version}.dmg"
+          
+          echo "正在为 $package 创建 DMG..."
+          
+          # 进入发布目录
+          pushd "$release_dir" > /dev/null
+          
+          # 查找并重命名 .app (如果需要)
+          current_app=$(find . -maxdepth 1 -name "*.app" | head -n 1)
+          if [ -z "$current_app" ]; then
+             echo "错误: 未找到 .app 文件"
+             exit 1
+          fi
+          
+          if [ "$(basename "$current_app")" != "${app_name}.app" ]; then
+             echo "重命名 $(basename "$current_app") -> ${app_name}.app"
+             mv "$current_app" "${app_name}.app"
+          fi
+          
+          # 清理旧的 DMG
+          rm -f "$dmg_name"
+          
+          # 执行 create-dmg
+          create-dmg \
+            --volname "${vol_name}" \
+            --volicon "${icon_path}" \
+            --window-pos ${window_pos} \
+            --window-size ${window_size} \
+            --icon-size "${icon_size}" \
+            --icon "${app_name}.app" ${app_icon_pos} \
+            --hide-extension "${app_name}.app" \
+            --app-drop-link ${drop_link_pos} \
+            "${dmg_name}" \
+            "${app_name}.app"
+            
+          result=$?
+          popd > /dev/null
+          
+          if [ $result -eq 0 ]; then
+             full_dmg_path="${release_dir}/${dmg_name}"
+             echo "DMG 创建成功: $full_dmg_path"
+             echo "DMG_PATH=$full_dmg_path" >> "$GITHUB_ENV"
+          else
+             echo "DMG 创建失败"
+             exit 1
+          fi
 
       - name: 签名 DMG（单包）
         shell: bash
@@ -639,7 +704,6 @@ jobs:
           echo ""
           echo "$PACKAGE_NAME DMG 签名信息:"
           codesign -dvv "$DMG_PATH" 2>&1 | head -20 || true
-
       - name: 判断是否需要公证
         id: notarize_flag
         shell: bash
@@ -656,7 +720,6 @@ jobs:
             echo "APPLE_NOTARIZE=false" >> "$GITHUB_ENV"
             echo "need_notarize=false" >> "$GITHUB_OUTPUT"
           fi
-
       - name: 公证 DMG (可选)
         if: ${{ env.APPLE_NOTARIZE == 'true' }}
         continue-on-error: true
@@ -743,7 +806,6 @@ jobs:
           
           # 清理临时文件
           rm -f /tmp/notary_output.txt
-
       - name: 上传构建产物（单包）
         uses: actions/upload-artifact@v4
         with:
@@ -791,14 +853,13 @@ jobs:
           command: |
             echo "在最终服务器创建软链..."
             ssh -o StrictHostKeyChecking=no "${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}" "cd ${{ env[format('scp_d_{0}', env.PACKAGE_NAME)] }} && ln -sf ${{ env.VERSION_DMG }} ${{ env.LATEST_NAME }}" 
-
-
+  
   build-all:
     if: github.event.inputs.build_type == 'all'
     runs-on: macos-latest
     strategy:
       matrix:
-        pkg: [pos, assistant, kds, tablet]
+        pkg: [pos, assistant, kds, tablet, shop]
       fail-fast: false
     env:
       PACKAGE_NAME: ${{ matrix.pkg }}
