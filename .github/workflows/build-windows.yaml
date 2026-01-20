@@ -4,7 +4,7 @@ env:
   output_path: releases
   assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Assistant/' || 'dc_apk/TTPOS/Test/Windows/Assistant/' }}
   kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Kitchen/' || 'dc_apk/TTPOS/Test/Windows/Kitchen/' }}
-  tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Prod/Menu/' || 'dc_apk/TTPOS/Test/Windows/Menu/' }}
+  tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Menu/' || 'dc_apk/TTPOS/Test/Windows/Menu/' }}
   pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Cashier/' || 'dc_apk/TTPOS/Test/Windows/Cashier/' }}
   shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Windows/Shop/' || 'dc_apk/TTPOS/Test/Windows/Shop/' }}
   # 中转服务器路径（根据包名和分支自动选择）
