@@ -307,6 +307,7 @@ jobs:
         run: |
           melos run init
           melos bs
+          brew install automake libtool
       - name: 更新环境变量文件
         shell: bash
         run: |
