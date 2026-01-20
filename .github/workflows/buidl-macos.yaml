@@ -807,12 +807,7 @@ jobs:
           
           # 清理临时文件
           rm -f /tmp/notary_output.txt
-      - name: 上传构建产物（单包）
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ env.PACKAGE_NAME }}-${{ env.MELOS_PACKAGE_VERSION }}
-          path: ${{ env.DMG_PATH }}
-          if-no-files-found: error
+
 
       - name: 上传到 Google Cloud Storage
         if: ${{ env.UPLOAD_TO_STORAGE == 'true' }}
