@@ -1,0 +1,252 @@
+name: Build TTPOS ALL APK Cache One or Moer
+
+#构建所有apk，上传APK到google存储桶和中转服务器。然后从中转服务器SCP各端APK包到官网的downloads目录
+env:
+  assistant_pack: assistant
+  kds_pack: kds
+  tablet_pack: tablet
+  pos_pack: pos
+  shop_pack: shop
+  qds_pack: qds
+  apk_output_path: releases
+  assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Assistant/' || 'dc_apk/TTPOS/Test/Assistant/' }}
+  kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kitchen/' || 'dc_apk/TTPOS/Test/Kitchen/' }}
+  tablet_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Menu/' || 'dc_apk/TTPOS/Test/Menu/' }}
+  pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Cashier/' || 'dc_apk/TTPOS/Test/Cashier/' }}
+  shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Shop/' || 'dc_apk/TTPOS/Test/Shop/' }}
+  qds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Qds/' || 'dc_apk/TTPOS/Test/Qds/' }}
+  #中转服务器路径
+  scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
+  scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
+  scp_s_tablet: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/tablet/' || '/hitosea/ttpos-apk/Test/tablet/' }}
+  scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
+  scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
+  scp_s_qds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/qds/' || '/hitosea/ttpos-apk/Test/qds/' }}
+  #最终下载路径：www.ttpos.com/downloads
+  scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Assistant/' || '/root/web/web/restant/out/downloads/Test/Assistant/' }}
+  scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kitchen/' || '/root/web/web/restant/out/downloads/Test/Kitchen/' }}
+  scp_d_tablet: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Menu/' || '/root/web/web/restant/out/downloads/Test/Menu/' }}
+  scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Cashier/' || '/root/web/web/restant/out/downloads/Test/Cashier/' }}
+  scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Shop/' || '/root/web/web/restant/out/downloads/Test/Shop/' }}
+  scp_d_qds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Qds/' || '/root/web/web/restant/out/downloads/Test/Qds/' }}
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: '目标仓库地址 (格式: owner/repo)'
+        required: true
+        default: 'innet8/ttpos-flutter'
+        type: string
+      branch:
+        description: "选择构建分支"
+        required: true
+        #default: 'release'
+        type: choice
+        options:
+          - "new-test"
+          - "release"
+          - "release-svenska"
+      base_url:
+        description: "选择API基础URL"
+        required: true
+        type: choice
+        options:
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "选择WebSocket基础URL"
+        required: true
+        type: choice
+        options:
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
+      packages:
+        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds)"
+        required: true
+        default: "all"
+        type: string
+      scp:
+        description: "是否启用SCP传输"
+        required: true
+        default: "off"
+        type: choice
+        options:
+          - "on"
+          - "off"
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          INPUT="${{ github.event.inputs.packages }}"
+          if [ "$INPUT" == "all" ]; then
+            echo 'matrix=["assistant","kds","tablet","pos","shop","qds"]' >> $GITHUB_OUTPUT
+          else
+            MATRIX=$(echo "$INPUT" | tr -d ' ' | sed 's/,/","/g')
+            echo "matrix=[\"${MATRIX}\"]" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        apk_path_name: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+          
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          flutter-version: "3.27.3"
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart pub global activate melos
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "18"
+          cache: "gradle"
+
+      - name: Melos init config
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+      - name: Config API_BASE_URL
+        id: config
+        run: |
+          sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/assistant/.env.production.local apps/kds/.env.production.local apps/pos/.env.production.local apps/tablet/.env.production.local apps/shop/.env.production.local apps/qds/.env.production.local
+          sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/assistant/.env.production.local apps/kds/.env.production.local apps/pos/.env.production.local apps/tablet/.env.production.local apps/shop/.env.production.local apps/qds/.env.production.local
+          cat ./apps/assistant/.env.production.local
+          
+      - name: Config SENTRY_DSN
+        id: sentry_dsn
+        if: github.event.inputs.branch == 'release'
+        run: |
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_ASSISTANT }}|' apps/assistant/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_KDS }}|' apps/kds/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_POS }}|' apps/pos/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_TABLET }}|' apps/tablet/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_SHOP }}|' apps/shop/.env.production.local
+          cat ./apps/assistant/.env.production.local
+      - name: Get Version Number
+        run: |
+          version_num=$(awk '/version:/ {print $2}' apps/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/pubspec.yaml | cut -d'+' -f1)
+          echo "VERSION=$version_num" >> $GITHUB_ENV
+          echo "Cashier_name=" >> $GITHUB_ENV
+          echo "Assistant_name=" >> $GITHUB_ENV
+          echo "Kitchen_name=" >> $GITHUB_ENV
+          echo "Menu_name=" >> $GITHUB_ENV
+          echo "Qds_name=" >> $GITHUB_ENV
+          echo "Shop_name=" >> $GITHUB_ENV
+          # 根据 matrix 判断包名和对应的软链名
+          case "${{ matrix.apk_path_name }}" in
+              "pos")
+                  echo "LATEST_NAME=TTPOS-Cashier-latest.apk" >>  $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Cashier-V${version_num}.apk" >>  $GITHUB_ENV
+                  ;;
+              "assistant")
+                  echo "LATEST_NAME=TTPOS-Assistant-latest.apk" >>  $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Assistant-V${version_num}.apk" >>  $GITHUB_ENV
+                  ;;
+              "kds")
+                  echo "LATEST_NAME=TTPOS-Kitchen-latest.apk" >> $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Kitchen-V${version_num}.apk" >>  $GITHUB_ENV
+                  ;;
+              "tablet")
+                  echo "LATEST_NAME=TTPOS-Menu-latest.apk" >>  $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Menu-V${version_num}.apk" >>  $GITHUB_ENV
+                  ;;
+              "qds")
+                  echo "LATEST_NAME=TTPOS-Queue-latest.apk" >>  $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Queue-V${version_num}.apk" >>  $GITHUB_ENV
+                  ;;
+              "shop")
+                  echo "LATEST_NAME=TTPOS-Shop-latest.apk" >> $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Shop-V${version_num}.apk" >> $GITHUB_ENV
+                  ;;
+          esac
+      - name: Build ASSISTANT APK
+        if: matrix.apk_path_name == 'assistant'
+        run: |
+          dart run ./scripts/build_android.dart --package=assistant
+          mv ${{ github.workspace }}/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk ${{ github.workspace }}/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/TTPOS-Assistant-V${{ env.VERSION }}.apk
+      - name: Build KDS APK
+        if: matrix.apk_path_name == 'kds'
+        run: |
+          dart run ./scripts/build_android.dart --package=kds
+      - name: Build Tablet APK
+        if: matrix.apk_path_name == 'tablet'
+        run: |
+          dart run ./scripts/build_android.dart --package=tablet
+      - name: Build POS APK
+        if: matrix.apk_path_name == 'pos'
+        run: |
+          dart run ./scripts/build_android.dart --package=pos
+          mv ${{ github.workspace }}/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk ${{ github.workspace }}/${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/TTPOS-Cashier-V${{ env.VERSION }}.apk
+      - name: Build Shop APK
+        if: matrix.apk_path_name == 'shop'
+        run: |
+          dart run ./scripts/build_android.dart --package=shop
+      - name: Build qds APK
+        if: matrix.apk_path_name == 'qds'
+        run: |
+          dart run ./scripts/build_android.dart --package=qds
+          
+      # - name: Upload APK to Google Cloud Storage
+      #   uses: "google-github-actions/auth@v2"
+      #   with:
+      #     credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
+
+      # - id: "upload-files"
+      #   uses: "google-github-actions/upload-cloud-storage@v2"
+      #   with:
+      #     path: ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}
+      #     destination: ${{ env[format('{0}_path', matrix.apk_path_name)] }}
+      #     parent: false
+
+      - name: SCP-UPLOAD
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            # 1. 传输到最终服务器
+            scp ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}${{ env.VERSION_APK }} ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
+          sourceFiles: |
+            ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk
+          targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
+          scpFirst: true
+
+      - name: In-ls-latest
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            # 2. 在最终服务器创建软链
+                ssh -o StrictHostKeyChecking=no ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }} "cd ${{ env[format('scp_d_{0}', matrix.apk_path_name)] }} && ln -sf ${{ env.VERSION_APK }} ${{ env.LATEST_NAME }}"
+                echo "Created symlink: ${{ env.LATEST_NAME }} -> ${{ env.VERSION_APK }}"
