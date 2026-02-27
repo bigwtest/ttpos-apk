@@ -190,8 +190,8 @@ jobs:
                   echo "VERSION_APK=TTPOS-Shop-V${version_num}.apk" >> $GITHUB_ENV
                   ;;
               "kiosk")
-                  echo "LATEST_NAME=TTPOS-Vertical-latest.apk" >> $GITHUB_ENV
-                  echo "VERSION_APK=TTPOS-Vertical-V${version_num}.apk" >> $GITHUB_ENV
+                  echo "LATEST_NAME=TTPOS-Kiosk-latest.apk" >> $GITHUB_ENV
+                  echo "VERSION_APK=TTPOS-Kiosk-V${version_num}.apk" >> $GITHUB_ENV
                   ;;
           esac
       - name: Build ASSISTANT APK
