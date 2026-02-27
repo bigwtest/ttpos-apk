@@ -8,6 +8,7 @@ env:
   pos_pack: pos
   shop_pack: shop
   qds_pack: qds
+  kiosk_pack: kiosk
   apk_output_path: releases
   assistant_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Assistant/' || 'dc_apk/TTPOS/Test/Assistant/' }}
   kds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kitchen/' || 'dc_apk/TTPOS/Test/Kitchen/' }}
@@ -15,6 +16,7 @@ env:
   pos_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Cashier/' || 'dc_apk/TTPOS/Test/Cashier/' }}
   shop_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Shop/' || 'dc_apk/TTPOS/Test/Shop/' }}
   qds_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Qds/' || 'dc_apk/TTPOS/Test/Qds/' }}
+  kiosk_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kiosk/' || 'dc_apk/TTPOS/Test/Kiosk/' }}
   #中转服务器路径
   scp_s_assistant: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/assistant/' || '/hitosea/ttpos-apk/Test/assistant/' }}
   scp_s_kds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kds/' || '/hitosea/ttpos-apk/Test/kds/' }}
@@ -22,6 +24,7 @@ env:
   scp_s_pos: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/pos/' || '/hitosea/ttpos-apk/Test/pos/' }}
   scp_s_shop: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/shop/' || '/hitosea/ttpos-apk/Test/shop/' }}
   scp_s_qds: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/qds/' || '/hitosea/ttpos-apk/Test/qds/' }}
+  scp_s_kiosk: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kiosk/' || '/hitosea/ttpos-apk/Test/kiosk/' }}
   #最终下载路径：www.ttpos.com/downloads
   scp_d_assistant: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Assistant/' || '/root/web/web/restant/out/downloads/Test/Assistant/' }}
   scp_d_kds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kitchen/' || '/root/web/web/restant/out/downloads/Test/Kitchen/' }}
@@ -29,6 +32,7 @@ env:
   scp_d_pos: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Cashier/' || '/root/web/web/restant/out/downloads/Test/Cashier/' }}
   scp_d_shop: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Shop/' || '/root/web/web/restant/out/downloads/Test/Shop/' }}
   scp_d_qds: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Qds/' || '/root/web/web/restant/out/downloads/Test/Qds/' }}
+  scp_d_kiosk: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kiosk/' || '/root/web/web/restant/out/downloads/Test/Kiosk/' }}
 on:
   workflow_dispatch:
     inputs:
@@ -46,6 +50,7 @@ on:
           - "new-test"
           - "release"
           - "release-svenska"
+          - "kiosk-dev"
       base_url:
         description: "选择API基础URL"
         required: true
@@ -63,7 +68,7 @@ on:
           - "wss://api.ttpos.com/ws"
           - "wss://ttpos-pro.keli.vip/ws"
       packages:
-        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds)"
+        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds,kiosk)"
         required: true
         default: "all"
         type: string
@@ -85,7 +90,7 @@ jobs:
         run: |
           INPUT="${{ github.event.inputs.packages }}"
           if [ "$INPUT" == "all" ]; then
-            echo 'matrix=["assistant","kds","tablet","pos","shop","qds"]' >> $GITHUB_OUTPUT
+            echo 'matrix=["assistant","kds","tablet","pos","shop","qds","kiosk"]' >> $GITHUB_OUTPUT
           else
             MATRIX=$(echo "$INPUT" | tr -d ' ' | sed 's/,/","/g')
             echo "matrix=[\"${MATRIX}\"]" >> $GITHUB_OUTPUT
