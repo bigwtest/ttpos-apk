@@ -1,117 +1,138 @@
-name: Build Web MEU or Mobile
+name: Build Web MEU 、 Mobile and Member
 
 env:
-
   apk_output_path: releases
   # Docker镜像配置
   REGISTRY: hub.hitosea.com
   IMAGE_NAME: ttpos-web
-  BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+  #BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
 
 on:
-  push:
-    tags:
-      - '*'
   workflow_dispatch:
     inputs:
-      branch: 
-        description: 'branch (e.g., release)'
+      repository:
+        description: '目标仓库地址 (格式: owner/repo)'
         required: true
+        default: 'innet8/ttpos-flutter'
+        type: string
+      branch:
+        description: "branch (e.g., release)"
+        required: true
+        #default: 'release'
         type: choice
         options:
-          - 'release'
-          - 'new-test'
-
-      base_url: 
-        description: 'base_url (e.g., base_url)'
+          - "new-test"
+          - "release"
+          - "release-bignum"
+      base_url:
+        description: "base_url (e.g., base_url)"
         required: true
         #default: 'https://api.ttpos.com/api/v1'
         type: choice
         options:
-          - 'https://api.ttpos.com/api/v1'
-          - 'https://ttpos-test1.ttpos.com/api/v1'
-          - 'https://ttpos-pro.keli.vip/api/v1'
-      base_ws_url: 
-        description: 'base_ws_url (e.g., base_ws_url)'
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "base_ws_url (e.g., base_ws_url)"
         required: true
         #default: 'wss://api.ttpos.com/ws'
         type: choice
         options:
-          - 'wss://api.ttpos.com/ws'
-          - 'wss://ttpos-test1.ttpos.com/ws'
-          - 'wss://ttpos-pro.keli.vip/ws'
-
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     strategy:
-        fail-fast: false
-        matrix:
-          program: [ menu, mobile  ]
+      fail-fast: false
+      matrix:
+        program: [menu, mobile, member]
+    env:
+      BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+      
     steps:
+      - name: 设置 IMAGE_TAG
+        id: set_image_tag
+        run: |
+          if [ "${BRANCH}" = "release" ] || [ "${BRANCH}" = "refs/heads/release" ]; then
+            echo "IMAGE_TAG=" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=test-" >> $GITHUB_ENV
+          fi
+      - name: 打印 IMAGE_TAG
+        run: echo "IMAGE_TAG=${IMAGE_TAG}"
+        
       - name: Checkout the code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: ${{ env.BRANCH }}
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
 
       - name: Echo Commit_id
         id: build
         run: |
-          echo "COMMIT_ID=$(git log -1 --pretty=format:%h -- .)" >> $GITHUB_OUTPUT    
+          echo "COMMIT_ID=$(git log -1 --pretty=format:%h -- .)" >> $GITHUB_OUTPUT
       #环境
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-            channel: stable
-            cache: true
-            flutter-version: '3.27.3'
-    
+          channel: stable
+          cache: true
+          flutter-version: "3.27.3"
+
       - name: Install Melos
         run: |
-            flutter --version
-            dart pub global activate melos
-    
+          flutter --version
+          dart pub global activate melos
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-            distribution: 'temurin'
-            java-version: '17'
-            cache: 'gradle'
+          distribution: "temurin"
+          java-version: "18"
+          cache: "gradle"
 
       - name: Melos init config
-        env: 
+        env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn
           FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
         run: |
-            melos run init
-            melos bs
-            
+          melos run init
+          melos bs
       - name: Config API_BASE_URL
-        if: matrix.program == 'menu'
-        id: menu_config
+        id: config
         run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/menu/.env.production.local
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/menu/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MENU }}|' apps/menu/.env.production.local
-            cat ./apps/menu/.env.production.local
-      - name: Config API_BASE_URL
-        if: matrix.program == 'mobile'
-        id: mobile_config
+          sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/menu/.env.production.local apps/mobile/.env.production.local apps/member/.env.production.local
+          sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/menu/.env.production.local apps/mobile/.env.production.local apps/member/.env.production.local
+          cat ./apps/menu/.env.production.local
+          cat ./apps/mobile/.env.production.local
+          cat ./apps/member/.env.production.local
+      
+      - name: Config SENTRY_DSN
+        id: sentry_dsn
+        if: github.event.inputs.branch == 'release'
         run: |
-            sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/mobile/.env.production.local
-            sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/mobile/.env.production.local
-            sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MOBILE }}|' apps/mobile/.env.production.local
-            cat ./apps/mobile/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MENU }}|' apps/menu/.env.production.local
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MOBILE }}|' apps/mobile/.env.production.local
+          cat ./apps/menu/.env.production.local
+          cat ./apps/mobile/.env.production.local
+      
       - name: Build Menu
         if: matrix.program == 'menu'
         run: |
-            bash -x ./scripts/build_web_html.sh menu
-
+          dart run ./scripts/build_web.dart --package=menu
       - name: Build Mobile
         if: matrix.program == 'mobile'
         run: |
-            bash -x ./scripts/build_web_html.sh mobile
+          dart run ./scripts/build_web.dart --package=mobile
+      - name: Build Member
+        if: matrix.program == 'member'
+        run: |
+          dart run ./scripts/build_web.dart --package=member
           
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
@@ -137,8 +158,26 @@ jobs:
           file: Dockerfile.${{ matrix.program }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:${{ steps.build.outputs.COMMIT_ID }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}${{ steps.build.outputs.COMMIT_ID }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max         
+
+  update-test-server:
+    runs-on: ubuntu-22.04
+    needs: build
+    if: needs.build.result == 'success' && (github.event.inputs.branch != 'release')
+    env:
+      BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+    
+    steps:
+      - name: Change Test Images Member
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_MOBILE_MENU_TEST_HOST }}
+          username: ${{ secrets.SSH_USER_MOBILE_MENU_TEST_HOST }}
+          key: ${{ secrets.SSH_RIVATEKEY_MOBILE_MENU_TEST_HOST }}
+          script: |
+            cd /ttpos-flutter
+            ./cmd update
