@@ -50,7 +50,7 @@ on:
           - "new-test"
           - "release"
           - "release-svenska"
-          - "kiosk-dev"
+          - "feature/kiosk-dev"
       base_url:
         description: "选择API基础URL"
         required: true
