@@ -163,6 +163,7 @@ jobs:
           echo "Menu_name=" >> $GITHUB_ENV
           echo "Qds_name=" >> $GITHUB_ENV
           echo "Shop_name=" >> $GITHUB_ENV
+          echo "Kiosk_name=" >> $GITHUB_ENV
           # 根据 matrix 判断包名和对应的软链名
           case "${{ matrix.apk_path_name }}" in
               "pos")
@@ -246,7 +247,7 @@ jobs:
           privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
           command: |
             # 1. 传输到最终服务器
-            scp ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}${{ env.VERSION_APK }} ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
+            scp -o StrictHostKeyChecking=no ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}${{ env.VERSION_APK }} ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
           sourceFiles: |
             ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk
           targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
