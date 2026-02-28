@@ -1,4 +1,4 @@
-name: Build Windows New
+name: Build TTPOS Windows
 
 env:
   output_path: releases
