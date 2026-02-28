@@ -1,4 +1,4 @@
-name: Build TTPOS ALL APK Cache One or Moer
+name: Build One or Moer TTPOS APK 
 
 #构建所有apk，上传APK到google存储桶和中转服务器。然后从中转服务器SCP各端APK包到官网的downloads目录
 env:
