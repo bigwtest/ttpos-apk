@@ -1,4 +1,4 @@
-name: Build TTPOS macOS App
+name: Build TTPOS macOS APP
 
 on:
   workflow_dispatch:
