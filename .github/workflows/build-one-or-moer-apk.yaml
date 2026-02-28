@@ -238,7 +238,18 @@ jobs:
           destination: ${{ env[format('{0}_path', matrix.apk_path_name)] }}
           parent: false
 
-      - name: SCP-UPLOAD
+      - name: SCP to Relay Server
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          sourceFiles: |
+            ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk
+          targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
+
+      - name: SCP Relay to Destination
         if: github.event.inputs.scp == 'on'
         uses: Comori/ssh@v0.0.7
         with:
@@ -246,13 +257,10 @@ jobs:
           username: ${{ secrets.SCP_S_USER }}
           privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
           command: |
+            ls -la ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}${{ env.VERSION_APK }}
             scp -o StrictHostKeyChecking=no ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}${{ env.VERSION_APK }} ${{secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env[format('scp_d_{0}', matrix.apk_path_name)] }}
-          sourceFiles: |
-            ${{ env.apk_output_path }}/${{ env[format('{0}_pack', matrix.apk_path_name)] }}/${{ env.VERSION }}/*.apk
-          targetDir: ${{ env[format('scp_s_{0}', matrix.apk_path_name)] }}
-          scpFirst: true
 
-      - name: In-ls-latest
+      - name: Create Symlink on Destination
         if: github.event.inputs.scp == 'on'
         uses: Comori/ssh@v0.0.7
         with:
