@@ -68,7 +68,7 @@ on:
           - "wss://api.ttpos.com/ws"
           - "wss://ttpos-pro.keli.vip/ws"
       packages:
-        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds,kiosk)"
+        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds)"
         required: true
         default: "all"
         type: string
@@ -90,7 +90,7 @@ jobs:
         run: |
           INPUT="${{ github.event.inputs.packages }}"
           if [ "$INPUT" == "all" ]; then
-            echo 'matrix=["assistant","kds","tablet","pos","shop","qds","kiosk"]' >> $GITHUB_OUTPUT
+            echo 'matrix=["assistant","kds","tablet","pos","shop","qds"]' >> $GITHUB_OUTPUT
           else
             MATRIX=$(echo "$INPUT" | tr -d ' ' | sed 's/,/","/g')
             echo "matrix=[\"${MATRIX}\"]" >> $GITHUB_OUTPUT
