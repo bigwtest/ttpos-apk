@@ -70,6 +70,13 @@ jobs:
           cache: true
           flutter-version: "3.41.2"
 
+      - name: Create FVM symlink
+        run: |
+          FLUTTER_SDK=$(dirname $(dirname $(which flutter)))
+          mkdir -p .fvm
+          ln -s "$FLUTTER_SDK" .fvm/flutter_sdk
+          echo "FVM symlink: .fvm/flutter_sdk -> $FLUTTER_SDK"
+
       - name: Install Melos
         run: |
           flutter --version
