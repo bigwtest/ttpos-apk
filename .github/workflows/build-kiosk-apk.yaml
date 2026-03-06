@@ -1,0 +1,159 @@
+name: Build Kiosk APK
+
+#独立构建kiosk APK，上传到Google存储桶和中转服务器，然后SCP到官网downloads目录
+env:
+  kiosk_pack: kiosk
+  apk_output_path: releases
+  kiosk_path: ${{ github.event.inputs.branch == 'release' && 'dc_apk/TTPOS/Prod/Kiosk/' || 'dc_apk/TTPOS/Test/Kiosk/' }}
+  #中转服务器路径
+  scp_s_kiosk: ${{ github.event.inputs.branch == 'release' && '/hitosea/ttpos-apk/Prod/kiosk/' || '/hitosea/ttpos-apk/Test/kiosk/' }}
+  #最终下载路径：www.ttpos.com/downloads
+  scp_d_kiosk: ${{ github.event.inputs.branch == 'release' && '/root/web/web/restant/out/downloads/Kiosk/' || '/root/web/web/restant/out/downloads/Test/Kiosk/' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: '目标仓库地址 (格式: owner/repo)'
+        required: true
+        default: 'innet8/ttpos-flutter'
+        type: string
+      branch:
+        description: "选择构建分支"
+        required: true
+        type: choice
+        options:
+          - "feature/kiosk-dev"
+          - "new-test"
+          - "release"
+      base_url:
+        description: "选择API基础URL"
+        required: true
+        type: choice
+        options:
+          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://api.ttpos.com/api/v1"
+          - "https://ttpos-pro.keli.vip/api/v1"
+      base_ws_url:
+        description: "选择WebSocket基础URL"
+        required: true
+        type: choice
+        options:
+          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://api.ttpos.com/ws"
+          - "wss://ttpos-pro.keli.vip/ws"
+      scp:
+        description: "是否启用SCP传输"
+        required: true
+        default: "off"
+        type: choice
+        options:
+          - "on"
+          - "off"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.repository }}
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          flutter-version: "3.41.2"
+
+      - name: Install Melos
+        run: |
+          flutter --version
+          dart pub global activate melos
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "18"
+          cache: "gradle"
+
+      - name: Melos init config
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+          FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+        run: |
+          melos run init
+          melos bs
+
+      - name: Config API_BASE_URL
+        run: |
+          sed -i 's|^API_BASE_URL=.*|API_BASE_URL=${{ github.event.inputs.base_url }}|' apps/kiosk/.env.production.local
+          sed -i 's|^WS_BASE_URL=.*|WS_BASE_URL=${{ github.event.inputs.base_ws_url }}|' apps/kiosk/.env.production.local
+          cat ./apps/kiosk/.env.production.local
+
+      - name: Config SENTRY_DSN
+        if: github.event.inputs.branch == 'release'
+        run: |
+          sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_KIOSK }}|' apps/kiosk/.env.production.local
+          cat ./apps/kiosk/.env.production.local
+
+      - name: Get Version Number
+        run: |
+          version_num=$(awk '/version:/ {print $2}' apps/kiosk/pubspec.yaml | cut -d'+' -f1)
+          echo "VERSION=$version_num" >> $GITHUB_ENV
+          echo "LATEST_NAME=TTPOS-Kiosk-latest.apk" >> $GITHUB_ENV
+          echo "VERSION_APK=TTPOS-Kiosk-V${version_num}.apk" >> $GITHUB_ENV
+
+      - name: Build Kiosk APK
+        run: |
+          dart run ./scripts/build_android.dart --package=kiosk
+
+      - name: Upload APK to Google Cloud Storage
+        uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.GOOGLE_STORAGE_CREDENTIALS }}"
+
+      - id: "upload-files"
+        uses: "google-github-actions/upload-cloud-storage@v2"
+        with:
+          path: ${{ env.apk_output_path }}/kiosk/${{ env.VERSION }}
+          destination: ${{ env.kiosk_path }}
+          parent: false
+
+      - name: SCP to Relay Server
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          sourceFiles: |
+            ${{ env.apk_output_path }}/kiosk/${{ env.VERSION }}/*.apk
+          targetDir: ${{ env.scp_s_kiosk }}
+
+      - name: SCP Relay to Destination
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            ls -la ${{ env.scp_s_kiosk }}${{ env.VERSION_APK }}
+            scp -o StrictHostKeyChecking=no ${{ env.scp_s_kiosk }}${{ env.VERSION_APK }} ${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }}:${{ env.scp_d_kiosk }}
+
+      - name: Create Symlink on Destination
+        if: github.event.inputs.scp == 'on'
+        uses: Comori/ssh@v0.0.7
+        with:
+          host: ${{ secrets.SCP_S_HOST }}
+          username: ${{ secrets.SCP_S_USER }}
+          privateKey: ${{ secrets.SCP_S_RIVATEKEY }}
+          command: |
+            ssh -o StrictHostKeyChecking=no ${{ secrets.SCP_D_USER }}@${{ secrets.SCP_D_HOST }} "cd ${{ env.scp_d_kiosk }} && ln -sf ${{ env.VERSION_APK }} ${{ env.LATEST_NAME }}"
+            echo "Created symlink: ${{ env.LATEST_NAME }} -> ${{ env.VERSION_APK }}"
