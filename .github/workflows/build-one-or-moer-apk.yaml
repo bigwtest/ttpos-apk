@@ -68,7 +68,7 @@ on:
           - "wss://api.ttpos.com/ws"
           - "wss://ttpos-pro.keli.vip/ws"
       packages:
-        description: "选择构建的端 (all=全部, 或逗号分隔: assistant,kds,tablet,pos,shop,qds)"
+        description: "选择构建的端 (all=全部(不包含kiosk，kiosk未正式上线), 或逗号分隔: assistant,kds,tablet,pos,shop,qds,kiosk)"
         required: true
         default: "all"
         type: string
