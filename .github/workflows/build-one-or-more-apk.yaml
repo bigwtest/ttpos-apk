@@ -24,7 +24,7 @@ on:
         required: true
         type: choice
         options:
-          - "new-test"
+          - "main"
           - "release"
           - "release-svenska"
           - "feature/kiosk-dev"
