@@ -24,7 +24,7 @@ on:
         required: true
         type: choice
         options:
-          - "main"
+          - "new-test"
           - "release"
           - "release-svenska"
           - "feature/kiosk-dev"
@@ -96,7 +96,13 @@ jobs:
         with:
           channel: stable
           cache: true
-          flutter-version: "3.38.1"
+          flutter-version: "3.41.2"
+
+      - name: Link Flutter SDK for melos (.fvm/flutter_sdk)
+        run: |
+          mkdir -p .fvm
+          ln -sfn "$FLUTTER_ROOT" .fvm/flutter_sdk
+          ls -la .fvm/flutter_sdk
 
       - name: Install Melos
         run: |
