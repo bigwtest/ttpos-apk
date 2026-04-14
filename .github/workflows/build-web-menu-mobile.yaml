@@ -2,9 +2,9 @@ name: Build Web MEU 、 Mobile and Member
 
 env:
   apk_output_path: releases
-  # Docker镜像配置
-  REGISTRY: hub.hitosea.com
-  IMAGE_NAME: ttpos-web
+  # Docker Hub 镜像配置: docker.io/1300775666/ttpos-web-<program>
+  REGISTRY: docker.io
+  DOCKERHUB_NAMESPACE: 1300775666
   #BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
 
 on:
@@ -13,7 +13,7 @@ on:
       repository:
         description: '目标仓库地址 (格式: owner/repo)'
         required: true
-        default: 'innet8/ttpos-flutter'
+        default: 'hitosea/ttpos-flutter'
         type: string
       branch:
         description: "branch (e.g., release)"
@@ -30,16 +30,16 @@ on:
         #default: 'https://api.ttpos.com/api/v1'
         type: choice
         options:
-          - "https://ttpos-test1.ttpos.com/api/v1"
+          - "https://ttpos.gw.dootask.com/api/v1"
           - "https://api.ttpos.com/api/v1"
           - "https://ttpos-pro.keli.vip/api/v1"
       base_ws_url:
         description: "base_ws_url (e.g., base_ws_url)"
         required: true
-        #default: 'wss://api.ttpos.com/ws'
+        #default: 'wss://ttpos.gw.dootask.com/ws'
         type: choice
         options:
-          - "wss://ttpos-test1.ttpos.com/ws"
+          - "wss://ttpos.gw.dootask.com/ws"
           - "wss://api.ttpos.com/ws"
           - "wss://ttpos-pro.keli.vip/ws"
 
@@ -142,15 +142,15 @@ jobs:
 
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
-      - name: Log into registry ${{ env.REGISTRY }}
+      - name: Log into Docker Hub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image to Docker Hub
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
@@ -158,11 +158,11 @@ jobs:
           file: Dockerfile.${{ matrix.program }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}${{ steps.build.outputs.COMMIT_ID }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}latest
+            ${{ env.DOCKERHUB_NAMESPACE }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}${{ steps.build.outputs.COMMIT_ID }}
+            ${{ env.DOCKERHUB_NAMESPACE }}/ttpos-web-${{ matrix.program }}:${{ env.IMAGE_TAG }}latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max         
+          cache-to: type=gha,mode=max
 
   update-test-server:
     runs-on: ubuntu-22.04
