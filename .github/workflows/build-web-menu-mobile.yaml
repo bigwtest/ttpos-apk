@@ -16,9 +16,9 @@ on:
         default: 'hitosea/ttpos-flutter'
         type: string
       branch:
-        description: "branch (e.g., release)"
+        description: "branch (e.g., main)"
         required: true
-        #default: 'release'
+        #default: 'main'
         type: choice
         options:
           - "main"
@@ -57,7 +57,7 @@ jobs:
       - name: 设置 IMAGE_TAG
         id: set_image_tag
         run: |
-          if [ "${BRANCH}" = "release" ] || [ "${BRANCH}" = "refs/heads/release" ]; then
+          if [ "${BRANCH}" = "main" ] || [ "${BRANCH}" = "refs/heads/main" ]; then
             echo "IMAGE_TAG=" >> $GITHUB_ENV
           else
             echo "IMAGE_TAG=test-" >> $GITHUB_ENV
@@ -120,7 +120,7 @@ jobs:
       
       - name: Config SENTRY_DSN
         id: sentry_dsn
-        if: github.event.inputs.branch == 'release'
+        if: github.event.inputs.branch == 'main'
         run: |
           sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MENU }}|' apps/menu/.env.production.local
           sed -i 's|^SENTRY_DSN=.*|SENTRY_DSN=${{ secrets.SENTRYDSN_MOBILE }}|' apps/mobile/.env.production.local
@@ -170,20 +170,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  update-test-server:
-    runs-on: ubuntu-22.04
-    needs: build
-    if: needs.build.result == 'success' && (github.event.inputs.branch != 'release')
-    env:
-      BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
+  # update-test-server:
+  #   runs-on: ubuntu-22.04
+  #   needs: build
+  #   if: needs.build.result == 'success' && (github.event.inputs.branch != 'main')
+  #   env:
+  #     BRANCH: ${{ github.event_name == 'push' && github.ref || github.event.inputs.branch }}
     
-    steps:
-      - name: Change Test Images Member
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_MOBILE_MENU_TEST_HOST }}
-          username: ${{ secrets.SSH_USER_MOBILE_MENU_TEST_HOST }}
-          key: ${{ secrets.SSH_RIVATEKEY_MOBILE_MENU_TEST_HOST }}
-          script: |
-            cd /ttpos-flutter
-            ./cmd update
+  #   steps:
+  #     - name: Change Test Images Member
+  #       uses: appleboy/ssh-action@v1
+  #       with:
+  #         host: ${{ secrets.SSH_MOBILE_MENU_TEST_HOST }}
+  #         username: ${{ secrets.SSH_USER_MOBILE_MENU_TEST_HOST }}
+  #         key: ${{ secrets.SSH_RIVATEKEY_MOBILE_MENU_TEST_HOST }}
+  #         script: |
+  #           cd /ttpos-flutter
+  #           ./cmd update
